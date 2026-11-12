@@ -1,0 +1,3981 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>IKEA KORTLINJE 42×9 點陣 LED & 8-bit 音效互動模擬器</title>
+  <style>
+    :root {
+      --bg-color: #0f1115;
+      --card-bg: #1a1d24;
+      --accent: #f59e0b;
+      --accent-glow: rgba(245, 158, 11, 0.4);
+      --led-off: #25231f;
+      --led-on: #ffbe3b;
+      --led-glow: rgba(255, 190, 59, 0.65);
+      --text: #e2e8f0;
+      --text-muted: #94a3b8;
+      --border: #2d3342;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg-color);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+      padding: 20px;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 20px;
+    }
+    header {
+      text-align: center;
+      margin-bottom: 5px;
+    }
+    header h1 {
+      font-size: 1.6rem;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+    }
+    header p {
+      color: var(--text-muted);
+      font-size: 0.9rem;
+      margin-top: 4px;
+    }
+
+    /* 時鐘硬體外框 */
+    .clock-chassis {
+      background: #1e2129;
+      border: 3px solid #333a4d;
+      border-radius: 18px;
+      padding: 24px 28px 18px 28px;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.7), inset 0 1px 2px rgba(255,255,255,0.1);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 16px;
+      max-width: 980px;
+      width: 100%;
+    }
+
+    /* 頂部 4 顆實體按鍵模擬 */
+    .top-buttons-bar {
+      display: flex;
+      gap: 16px;
+      width: 100%;
+      justify-content: center;
+      padding-bottom: 8px;
+      border-bottom: 1px dashed var(--border);
+    }
+    .hw-btn {
+      background: #2a303e;
+      color: #cbd5e1;
+      border: 1px solid #475569;
+      border-radius: 10px;
+      padding: 10px 18px;
+      font-size: 0.88rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      transition: all 0.1s ease;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+      user-select: none;
+    }
+    .hw-btn:active, .hw-btn.pressed {
+      transform: translateY(2px);
+      box-shadow: 0 1px 2px rgba(0,0,0,0.5);
+      background: var(--accent);
+      color: #000;
+      border-color: #d97706;
+    }
+    .hw-btn .btn-hint {
+      font-size: 0.7rem;
+      color: var(--text-muted);
+      font-weight: normal;
+    }
+    .hw-btn:active .btn-hint, .hw-btn.pressed .btn-hint {
+      color: #333;
+    }
+
+    /* 螢幕外觀 */
+    .screen-bezel {
+      background: #090a0d;
+      border: 3px solid #14171f;
+      border-radius: 12px;
+      padding: 16px 20px;
+      box-shadow: inset 0 0 25px rgba(0,0,0,0.9), 0 0 15px rgba(0,0,0,0.4);
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      width: 100%;
+      justify-content: center;
+    }
+
+    /* 側邊指示燈 AM/PM/AL1/ZZ/AL2 */
+    .indicators {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      justify-content: space-around;
+      height: 140px;
+    }
+    .ind-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.68rem;
+      font-weight: bold;
+      color: #555c6d;
+    }
+    .ind-led {
+      width: 8px;
+      height: 8px;
+      border-radius: 0;
+      background: #252830;
+      box-shadow: inset 0 1px 2px rgba(0,0,0,0.8);
+      transition: all 0.15s ease;
+    }
+    .ind-item.active {
+      color: #ffbe3b;
+    }
+    .ind-item.active .ind-led {
+      background: #ffbe3b;
+      box-shadow: 0 0 8px #ffbe3b, 0 0 14px rgba(255, 190, 59, 0.8);
+    }
+
+    /* 42x9 點陣 Canvas */
+    canvas#matrix {
+      background: #0d0f13;
+      border-radius: 6px;
+      cursor: crosshair;
+      image-rendering: pixelated;
+      max-width: 100%;
+      height: auto;
+      box-shadow: 0 0 20px rgba(0,0,0,0.8);
+    }
+
+    /* 控制面板區塊 */
+    .controls-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(290px, 1fr));
+      gap: 16px;
+      max-width: 980px;
+      width: 100%;
+    }
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px 20px;
+    }
+    .card h3 {
+      font-size: 1.05rem;
+      color: #f1f5f9;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .btn-group {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .opt-btn {
+      background: #232834;
+      border: 1px solid #3b4254;
+      color: #e2e8f0;
+      border-radius: 8px;
+      padding: 8px 14px;
+      font-size: 0.82rem;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .opt-btn:hover {
+      background: #2d3444;
+      border-color: #4b5563;
+      color: #fff;
+    }
+    .opt-btn.active {
+      background: #ca8a04;
+      color: #fff;
+      border-color: #eab308;
+      font-weight: 600;
+      box-shadow: 0 0 10px rgba(234, 179, 8, 0.4);
+    }
+    .opt-btn.primary {
+      background: #2563eb;
+      border-color: #3b82f6;
+      color: #fff;
+    }
+    .opt-btn.primary:hover {
+      background: #1d4ed8;
+    }
+
+    /* 像素怪獸測試面板狀態列 */
+    .status-row {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 8px;
+      font-size: 0.88rem;
+    }
+    .status-val {
+      color: var(--accent);
+      font-weight: bold;
+    }
+
+    /* 音量控制器 */
+    .audio-bar {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-top: 10px;
+      font-size: 0.85rem;
+    }
+    .audio-bar input[type=range] {
+      flex: 1;
+      accent-color: var(--accent);
+    }
+
+    /* 快捷鍵提示 */
+    .hint-bar {
+      text-align: center;
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+    kbd {
+      background: #242936;
+      border: 1px solid #4b5563;
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-size: 0.75rem;
+      color: #f1f5f9;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1>🕹️ IKEA KORTLINJE 42×9 點陣 LED & 8-bit 音效模擬器</h1>
+    <p>完全硬體擬真 · 13 大復古主題 · 像素怪獸養成 · Web Audio 方波合成 · <a href="firmware_preview.html" style="color:#38bdf8">🔌 韌體播放預覽</a></p>
+  </header>
+
+  <!-- 時鐘外觀模擬 -->
+  <div class="clock-chassis">
+    <!-- 頂部 4 顆實體按鍵 -->
+    <div class="top-buttons-bar">
+      <button class="hw-btn" id="hwKey1">
+        <span id="k1Label">KEY 1 (餵食)</span>
+        <span class="btn-hint"><kbd>1</kbd> 或 左箭頭</span>
+      </button>
+      <button class="hw-btn" id="hwKey2">
+        <span id="k2Label">KEY 2 (玩耍/跳躍)</span>
+        <span class="btn-hint"><kbd>2</kbd> 或 <kbd>Space</kbd></span>
+      </button>
+      <button class="hw-btn" id="hwKey3">
+        <span id="k3Label">KEY 3 (打掃/動作)</span>
+        <span class="btn-hint"><kbd>3</kbd> 或 右箭頭</span>
+      </button>
+      <button class="hw-btn" id="hwKey4">
+        <span id="k4Label">KEY 4 (查狀態/解鬧鐘)</span>
+        <span class="btn-hint"><kbd>4</kbd> (長按切換)</span>
+      </button>
+    </div>
+
+    <!-- 螢幕區 (含側邊指示燈與 42x9 點陣) -->
+    <div class="screen-bezel">
+      <div class="indicators">
+        <div class="ind-item" id="indAM"><div class="ind-led"></div> AM</div>
+        <div class="ind-item" id="indPM"><div class="ind-led"></div> PM</div>
+        <div class="ind-item" id="indAL1"><div class="ind-led"></div> AL1</div>
+        <div class="ind-item" id="indZZ"><div class="ind-led"></div> ZZ</div>
+        <div class="ind-item" id="indAL2"><div class="ind-led"></div> AL2</div>
+      </div>
+      <canvas id="matrix" width="840" height="180"></canvas>
+    </div>
+
+    <!-- 音效音量與開關 -->
+    <div class="audio-bar" style="width: 100%; max-width: 600px;">
+      <span>🔊 8-bit 蜂鳴器模擬：</span>
+      <input type="range" id="volSlider" min="0" max="100" value="70">
+      <span id="volText">70%</span>
+      <button class="opt-btn" id="muteBtn">靜音</button>
+      <button class="opt-btn" id="testToneBtn">測試嗶聲 (1kHz)</button>
+    </div>
+  </div>
+
+  <div class="hint-bar">
+    鍵盤操作：<kbd>1</kbd> 鍵 1 / <kbd>2</kbd> 鍵 2 / <kbd>3</kbd> 鍵 3 / <kbd>4</kbd> 鍵 4 / <kbd>Space</kbd> 跳躍或解除鬧鐘 / <kbd>R</kbd> 隨機鬧鐘
+  </div>
+
+  <!-- 下方操作與模式選擇區 -->
+  <div class="controls-grid">
+
+    <!-- 模式選擇 -->
+    <div class="card">
+      <h3>📟 運行模式與時鐘樣式切換</h3>
+      <div class="btn-group">
+        <button class="opt-btn active" id="btnModeClock">🕒 一般時鐘</button>
+        <button class="opt-btn" id="btnModeTama">👾 像素怪獸模式</button>
+        <button class="opt-btn primary" id="btnRandomAlarm">⏰ 觸發隨機盲盒鬧鐘</button>
+      </div>
+      <div style="margin-top: 12px; padding-top: 10px; border-top: 1px dashed var(--border);">
+        <div style="font-size: 0.82rem; color: #cbd5e1; margin-bottom: 6px; font-weight: 600;">🎨 時鐘畫面樣式選擇（亦可按上方 KEY 3 切換）：</div>
+        <div class="btn-group">
+          <button class="opt-btn" id="btnClockStyleOriginal" onclick="setClockStyle('original')">原廠 / VIPnytt (7×9 粗體 HH:MM)</button>
+          <button class="opt-btn active" id="btnClockStyleHybrid" onclick="setClockStyle('hybrid')">折衷版 (原廠雙線粗胖時分 + 右下小秒)</button>
+        </div>
+      </div>
+      <p style="margin-top:10px; font-size:0.8rem; color:var(--text-muted);" id="modeDesc">
+        🕒 目前為【折衷版】：保留原廠雙線粗胖筆畫 (6×9) 顯示 HH:MM + 2×2 恆亮粗冒號 + 右下角 3×5 小秒數。
+      </p>
+    </div>
+
+    <!-- 13 大復古主題直選測試 -->
+    <div class="card" style="grid-column: span 2;">
+      <h3>🎮 13 大復古主題即時演出（點擊試看試聽）</h3>
+      <div class="btn-group">
+        <button class="opt-btn" onclick="playTheme('pacman')">🟡 小精靈 (機率隨機抽場景)</button>
+        <button class="opt-btn" onclick="playTheme('dino')">🦖 Chrome 斷網恐龍</button>
+        <button class="opt-btn" onclick="playTheme('mario')">🍄 超級馬力歐</button>
+        <button class="opt-btn" onclick="playTheme('invaders')">👾 太空侵略者/小蜜蜂</button>
+        <button class="opt-btn" onclick="playTheme('pokemon')">⚡ 寶可夢 Game Boy</button>
+        <button class="opt-btn" onclick="playTheme('continue')">🪙 街機 Continue 9..8..7</button>
+        <button class="opt-btn" onclick="playTheme('bsod')">💻 Windows 藍屏重啟</button>
+        <button class="opt-btn" onclick="playTheme('tetris')">🧱 俄羅斯方塊</button>
+        <button class="opt-btn" onclick="snakeForcedPlan = null; playTheme('snake')">🐍 9. 貪食蛇 Snake</button>
+        <button class="opt-btn" onclick="playTheme('flappy')">🐤 10. 笨鳥先飛 Flappy Bird</button>
+        <button class="opt-btn" onclick="playTheme('rhythm')">🎵 11. 節奏音軌 Rhythm</button>
+        <button class="opt-btn" onclick="racerForcedPlan = null; playTheme('racer')">🏎️ 12. 公路賽車 Racer</button>
+        <button class="opt-btn" onclick="pongForcedPlan = null; playTheme('pong')">🏓 13. 乒乓球 Pong</button>
+      </div>
+      <div style="margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--border);">
+        <div style="font-size: 0.8rem; color: #cbd5e1; margin-bottom: 6px; font-weight: 600;">
+          🟡 小精靈 4 子場景（點擊上方「🟡 小精靈」會依機率隨機抽取，亦可直接點擊下方按鈕指定預覽）：
+        </div>
+        <div class="btn-group">
+          <button class="opt-btn" id="btnPacScene1" onclick="playPacmanVariant(1)">場景 1：左→右 無能量球 (40%)</button>
+          <button class="opt-btn" id="btnPacScene2" onclick="playPacmanVariant(2)">場景 2：右→左 無能量球 (40%)</button>
+          <button class="opt-btn" id="btnPacScene3" onclick="playPacmanVariant(3)">場景 3：左→右 含能量球 (10%)</button>
+          <button class="opt-btn" id="btnPacScene4" onclick="playPacmanVariant(4)">場景 4：右→左 追擊模式 (10%)</button>
+        </div>
+      </div>
+      <div style="margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--border);">
+        <div style="font-size: 0.8rem; color: #cbd5e1; margin-bottom: 6px; font-weight: 600;">
+          🐍 貪食蛇 6 組固定劇本（點擊上方「🐍 9. 貪食蛇」每輪隨機換一組，亦可直接指定預覽並循環播放）：
+        </div>
+        <div class="btn-group">
+          <button class="opt-btn" id="btnSnakePlan1" onclick="playSnakePlan(0)">劇本 1</button>
+          <button class="opt-btn" id="btnSnakePlan2" onclick="playSnakePlan(1)">劇本 2</button>
+          <button class="opt-btn" id="btnSnakePlan3" onclick="playSnakePlan(2)">劇本 3</button>
+          <button class="opt-btn" id="btnSnakePlan4" onclick="playSnakePlan(3)">劇本 4</button>
+          <button class="opt-btn" id="btnSnakePlan5" onclick="playSnakePlan(4)">劇本 5</button>
+          <button class="opt-btn" id="btnSnakePlan6" onclick="playSnakePlan(5)">劇本 6</button>
+        </div>
+      </div>
+      <div style="margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--border);">
+        <div style="font-size: 0.8rem; color: #cbd5e1; margin-bottom: 6px; font-weight: 600;">
+          🏎️ 公路賽車 6 組固定劇本（點擊上方「🏎️ 12. 公路賽車」每輪隨機換一組，亦可直接指定預覽並循環播放）：
+        </div>
+        <div class="btn-group">
+          <button class="opt-btn" id="btnRacerPlan1" onclick="playRacerPlan(0)">劇本 1 夾擊</button>
+          <button class="opt-btn" id="btnRacerPlan2" onclick="playRacerPlan(1)">劇本 2 太晚</button>
+          <button class="opt-btn" id="btnRacerPlan3" onclick="playRacerPlan(2)">劇本 3 慌張</button>
+          <button class="opt-btn" id="btnRacerPlan4" onclick="playRacerPlan(3)">劇本 4 太晚</button>
+          <button class="opt-btn" id="btnRacerPlan5" onclick="playRacerPlan(4)">劇本 5 慌張</button>
+          <button class="opt-btn" id="btnRacerPlan6" onclick="playRacerPlan(5)">劇本 6 夾擊</button>
+        </div>
+      </div>
+      <div style="margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--border);">
+        <div style="font-size: 0.8rem; color: #cbd5e1; margin-bottom: 6px; font-weight: 600;">
+          🏓 乒乓球 6 組固定劇本（CPU 比分在前；點擊上方「🏓 13. 乒乓球」每輪隨機換一組，亦可直接指定預覽並循環播放）：
+        </div>
+        <div class="btn-group">
+          <button class="opt-btn" id="btnPongPlan1" onclick="playPongPlan(0)">劇本 1 (3-0)</button>
+          <button class="opt-btn" id="btnPongPlan2" onclick="playPongPlan(1)">劇本 2 (3-1)</button>
+          <button class="opt-btn" id="btnPongPlan3" onclick="playPongPlan(2)">劇本 3 (3-2)</button>
+          <button class="opt-btn" id="btnPongPlan4" onclick="playPongPlan(3)">劇本 4 (3-1)</button>
+          <button class="opt-btn" id="btnPongPlan5" onclick="playPongPlan(4)">劇本 5 (3-2)</button>
+          <button class="opt-btn" id="btnPongPlan6" onclick="playPongPlan(5)">劇本 6 (3-1)</button>
+        </div>
+      </div>
+      <p style="margin-top:10px; font-size:0.8rem; color:var(--text-muted);">
+        提示：鬧鐘響起時按上方 <strong>KEY 4 或鍵盤 Space</strong> 即可觸發專屬的「反轉彩蛋」結束鬧鈴！
+      </p>
+    </div>
+
+    <!-- 像素怪獸測試面板 -->
+    <div class="card" id="tamaCard">
+      <h3>👾 像素怪獸養成（測試面板）</h3>
+      <div class="status-row"><span>寵物世界時間：</span><span class="status-val" id="monClock">-</span></div>
+      <div class="status-row"><span>型態：</span><span class="status-val" id="monForm">-</span></div>
+      <div class="status-row"><span>數值：</span><span class="status-val" id="monStats">-</span></div>
+      <div class="status-row"><span>照顧：</span><span class="status-val" id="monCare">-</span></div>
+      <div class="status-row"><span>進化：</span><span class="status-val" id="monNext">-</span></div>
+      <div class="status-row"><span>紀錄：</span><span class="status-val" id="monCount" style="font-size:0.75rem">-</span></div>
+      <div style="font-size:0.8rem; color:#cbd5e1; margin:8px 0 4px; font-weight:600;">⏩ 時間快轉</div>
+      <div class="btn-group">
+        <button class="opt-btn" data-monspeed="1" onclick="monSetSpeed(1)">1×（真實）</button>
+        <button class="opt-btn active" data-monspeed="60" onclick="monSetSpeed(60)">1 秒 = 1 分</button>
+        <button class="opt-btn" data-monspeed="600" onclick="monSetSpeed(600)">1 秒 = 10 分</button>
+        <button class="opt-btn" data-monspeed="3600" onclick="monSetSpeed(3600)">1 秒 = 1 小時</button>
+        <button class="opt-btn" onclick="monSkipMinutes(60)">+1 小時</button>
+        <button class="opt-btn" onclick="monSkipMinutes(1440)">+1 天</button>
+        <button class="opt-btn" onclick="monJumpToHour(22, 58)">跳到 22:58</button>
+        <button class="opt-btn" onclick="monJumpToHour(6, 58)">跳到 06:58</button>
+      </div>
+      <div style="font-size:0.8rem; color:#cbd5e1; margin:8px 0 4px; font-weight:600;">🎮 操作（暫定按鍵：K1 餵正餐、K2 訓練 / 第二下出拳 / 接受挑戰、K3 打掃或打針、K4 狀態頁 → 最後一頁圖鑑書架：K1/K3 左右選、K2 看資料、再按 K2 換牠出來養或孵新蛋）</div>
+      <div class="btn-group">
+        <button class="opt-btn" onclick="monDebug('snack')">🍰 餵零食</button>
+        <button class="opt-btn" onclick="monDebug('battle')">⚔️ 立即對戰</button>
+        <button class="opt-btn" onclick="monDebug('challenge')">❗ 野生挑戰上門</button>
+      </div>
+      <div style="font-size:0.8rem; color:#cbd5e1; margin:8px 0 4px; font-weight:600;">🧪 測試用</div>
+      <div class="btn-group">
+        <button class="opt-btn" onclick="monDebug('hunger')">飽食 -1</button>
+        <button class="opt-btn" onclick="monDebug('mood')">心情 -1</button>
+        <button class="opt-btn" onclick="monDebug('poop')">+1 便便</button>
+        <button class="opt-btn" onclick="monDebug('sick')">生病</button>
+        <button class="opt-btn" onclick="monDebug('power')">力量 +5</button>
+        <button class="opt-btn" onclick="monDebug('evolve')">立即進化</button>
+        <button class="opt-btn" onclick="monDebug('fill')">📖 圖鑑 +1 隻（完全體）</button>
+        <button class="opt-btn" onclick="monDebug('reset')">🥚 清空圖鑑重新開始</button>
+        <button class="opt-btn" id="monSoundBtn" onclick="monDebug('sound')">🔔 呼叫音效：開</button>
+      </div>
+    </div>
+
+    <!-- 點陣輸出工具 -->
+    <div class="card">
+      <h3>🛠️ 點陣代碼導出工具</h3>
+      <p style="font-size:0.8rem; color:var(--text-muted); margin-bottom:8px;">
+        可將當前 42×9 畫面的每個像素導出為 C++ PROGMEM 十六進位陣列：
+      </p>
+      <button class="opt-btn" id="btnExportCpp">導出當前幀為 C++ 陣列</button>
+      <textarea id="txtExport" style="width:100%; height:75px; margin-top:8px; background:#0d0f13; color:#a3e635; border:1px solid #334155; font-family:monospace; font-size:0.75rem; padding:6px; border-radius:6px;" readonly placeholder="// 導出結果將顯示於此..."></textarea>
+    </div>
+
+  </div>
+
+  <script>
+    /* =====================================================================
+     * 1. 42x9 點陣 LED 模擬器核心繪圖引擎
+     * ===================================================================== */
+    const COLS = 42, ROWS = 9;
+    const canvas = document.getElementById('matrix');
+    const ctx = canvas.getContext('2d');
+    
+    // 緩衝區：42 * 9 布林陣列
+    let buffer = new Uint8Array(COLS * ROWS);
+
+    // 清空緩衝
+    function clearBuffer() {
+      buffer.fill(0);
+    }
+
+    // 畫點
+    function setPixel(x, y, val = 1) {
+      if (x >= 0 && x < COLS && y >= 0 && y < ROWS) {
+        buffer[y * COLS + x] = val ? 1 : 0;
+      }
+    }
+
+    function getPixel(x, y) {
+      if (x >= 0 && x < COLS && y >= 0 && y < ROWS) {
+        return buffer[y * COLS + x];
+      }
+      return 0;
+    }
+
+    // 畫線
+    function drawLine(x0, y0, x1, y1) {
+      const dx = Math.abs(x1 - x0), dy = Math.abs(y1 - y0);
+      const sx = (x0 < x1) ? 1 : -1, sy = (y0 < y1) ? 1 : -1;
+      let err = dx - dy;
+      while (true) {
+        setPixel(x0, y0);
+        if (x0 === x1 && y0 === y1) break;
+        const e2 = 2 * err;
+        if (e2 > -dy) { err -= dy; x0 += sx; }
+        if (e2 < dx) { err += dx; y0 += sy; }
+      }
+    }
+
+    // 繪製 1-bit Sprite (支援 flipX 水平翻轉)
+    function drawSprite(sprite, w, h, x, y, flipX = false) {
+      for (let r = 0; r < h; r++) {
+        const rowByte = sprite[r];
+        for (let c = 0; c < w; c++) {
+          const bitIdx = flipX ? c : (w - 1 - c);
+          if (rowByte & (1 << bitIdx)) {
+            setPixel(x + c, y + r);
+          }
+        }
+      }
+    }
+
+    // 繪製極簡 3x5 數字
+    const NUM_FONT_3x5 = [
+      [0x7, 0x5, 0x5, 0x5, 0x7], // 0
+      [0x2, 0x6, 0x2, 0x2, 0x7], // 1
+      [0x7, 0x1, 0x7, 0x4, 0x7], // 2
+      [0x7, 0x1, 0x7, 0x1, 0x7], // 3
+      [0x5, 0x5, 0x7, 0x1, 0x1], // 4
+      [0x7, 0x4, 0x7, 0x1, 0x7], // 5
+      [0x7, 0x4, 0x7, 0x5, 0x7], // 6
+      [0x7, 0x1, 0x2, 0x4, 0x4], // 7
+      [0x7, 0x5, 0x7, 0x5, 0x7], // 8
+      [0x7, 0x5, 0x7, 0x1, 0x7], // 9
+    ];
+
+    // 樣式 A：IKEA 原廠 / VIPnytt/Kortlinje (KortlinjeFont.h 7x9 雙線加粗字體，數字 1 寬 6)
+    const KORTLINJE_FONT_7x9 = [
+      { w: 7, rows: [0b0111110, 0b1100011, 0b1100011, 0b1100011, 0b1100011, 0b1100011, 0b1100011, 0b1100011, 0b0111110] }, // 0
+      { w: 6, rows: [0b001100,  0b011100,  0b111100,  0b001100,  0b001100,  0b001100,  0b001100,  0b001100,  0b111111]  }, // 1
+      { w: 7, rows: [0b0111110, 0b1100011, 0b1100011, 0b0000110, 0b0001100, 0b0001100, 0b0011000, 0b0110000, 0b1111111] }, // 2
+      { w: 7, rows: [0b0111110, 0b1100011, 0b1100011, 0b0000011, 0b0001110, 0b0000011, 0b1100011, 0b1100011, 0b0111110] }, // 3
+      { w: 7, rows: [0b0000110, 0b0001110, 0b0011110, 0b0110110, 0b1100110, 0b1100110, 0b1111111, 0b0000110, 0b0000110] }, // 4
+      { w: 7, rows: [0b1111111, 0b1100000, 0b1100000, 0b1100000, 0b1111110, 0b0000011, 0b0000011, 0b0000011, 0b1111110] }, // 5
+      { w: 7, rows: [0b0111110, 0b1100011, 0b1100011, 0b1100000, 0b1111110, 0b1100011, 0b1100011, 0b1100011, 0b0111110] }, // 6
+      { w: 7, rows: [0b1111111, 0b0000011, 0b0000011, 0b0000011, 0b0000110, 0b0000110, 0b0001100, 0b0001100, 0b0001100] }, // 7
+      { w: 7, rows: [0b0111110, 0b1100011, 0b1100011, 0b1100011, 0b0111110, 0b1100011, 0b1100011, 0b1100011, 0b0111110] }, // 8
+      { w: 7, rows: [0b0111110, 0b1100011, 0b1100011, 0b1100011, 0b0111111, 0b0000011, 0b1100011, 0b1100011, 0b0111110] }, // 9
+    ];
+
+    // 右下角秒數專用 3x5 字體 (7 的筆畫更俐落)
+    const TINY_SECONDS_3x5 = [
+      [7,5,5,5,7], [2,6,2,2,7], [7,1,7,4,7], [7,1,7,1,7], [5,5,7,1,1],
+      [7,4,7,1,7], [7,4,7,5,7], [7,1,1,1,1], [7,5,7,5,7], [7,5,7,1,7]
+    ];
+
+    // 樣式 B：折衷版 6x9 原廠雙線粗胖字體 (保留垂直 2 格粗筆畫與導角，縮減 1 格內距以容納右下角秒數)
+    const KORTLINJE_BOLD_6x9 = [
+      [0b011110, 0b110011, 0b110011, 0b110011, 0b110011, 0b110011, 0b110011, 0b110011, 0b011110], // 0
+      [0b001100, 0b011100, 0b111100, 0b001100, 0b001100, 0b001100, 0b001100, 0b001100, 0b111111], // 1
+      [0b011110, 0b110011, 0b000011, 0b000110, 0b001100, 0b011000, 0b110000, 0b110000, 0b111111], // 2
+      [0b011110, 0b110011, 0b000011, 0b000011, 0b001110, 0b000011, 0b000011, 0b110011, 0b011110], // 3
+      [0b000110, 0b001110, 0b011110, 0b110110, 0b110110, 0b111111, 0b000110, 0b000110, 0b000110], // 4
+      [0b111111, 0b110000, 0b110000, 0b110000, 0b111110, 0b000011, 0b000011, 0b110011, 0b011110], // 5
+      [0b011110, 0b110011, 0b110000, 0b110000, 0b111110, 0b110011, 0b110011, 0b110011, 0b011110], // 6
+      [0b111111, 0b000011, 0b000011, 0b000110, 0b000110, 0b001100, 0b001100, 0b001100, 0b001100], // 7
+      [0b011110, 0b110011, 0b110011, 0b110011, 0b011110, 0b110011, 0b110011, 0b110011, 0b011110], // 8
+      [0b011110, 0b110011, 0b110011, 0b110011, 0b011111, 0b000011, 0b110011, 0b110011, 0b011110], // 9
+    ];
+
+    function drawDigit(num, x, y) {
+      if (num >= 0 && num <= 9) {
+        drawSprite(NUM_FONT_3x5[num], 3, 5, x, y);
+      }
+    }
+
+    function drawKortlinjeDigit(num, x, y) {
+      if (num >= 0 && num <= 9) {
+        const g = KORTLINJE_FONT_7x9[num];
+        drawSprite(g.rows, g.w, 9, x, y);
+      }
+    }
+
+    // 渲染畫布（模擬真實直角方形 LED 均光格柵顆粒）
+    function renderMatrix() {
+      ctx.fillStyle = '#080a0e';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      const cellW = canvas.width / COLS;
+      const cellH = canvas.height / ROWS;
+      const pad = 2; // 格柵間隙
+      const boxW = cellW - pad * 2;
+      const boxH = cellH - pad * 2;
+
+      for (let y = 0; y < ROWS; y++) {
+        for (let x = 0; x < COLS; x++) {
+          const rx = x * cellW + pad;
+          const ry = y * cellH + pad;
+          const on = buffer[y * COLS + x];
+
+          if (on) {
+            // 發光直角方形 LED (純色呈現)
+            ctx.fillStyle = '#ffbe3b';
+            ctx.shadowBlur = 0;
+            ctx.fillRect(rx, ry, boxW, boxH);
+          } else {
+            // 未點亮直角方形格柵底色
+            ctx.fillStyle = '#181b22';
+            ctx.shadowBlur = 0;
+            ctx.fillRect(rx, ry, boxW, boxH);
+          }
+        }
+      }
+    }
+
+    /* =====================================================================
+     * 2. 8-bit Web Audio 方波音效合成引擎 (完美對標 ESP32 ledcWriteTone)
+     * ===================================================================== */
+    let audioCtx = null;
+    let masterGain = null;
+    let isMuted = false;
+
+    function initAudio() {
+      if (!audioCtx) {
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        audioCtx = new AudioContext();
+        masterGain = audioCtx.createGain();
+        masterGain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+        masterGain.connect(audioCtx.destination);
+      }
+      if (audioCtx.state === 'suspended') {
+        audioCtx.resume();
+      }
+    }
+
+    // 發出單音
+    function playTone(freq, durationMs, gainLevel = 1.0) {
+      if (isMuted || freq <= 0) return;
+      initAudio();
+
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+
+      osc.type = 'square'; // 經典 8-bit 方波
+      osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+
+      const now = audioCtx.currentTime;
+      const dur = durationMs / 1000;
+
+      gain.gain.setValueAtTime(0.25 * gainLevel, now);
+      // 微小衰減避免爆音 (click noise)
+      gain.gain.exponentialRampToValueAtTime(0.001, now + dur);
+
+      osc.connect(gain);
+      gain.connect(masterGain);
+
+      osc.start(now);
+      osc.stop(now + dur);
+    }
+
+    // 發出滑音 (Portamento) 如雷射或瑪莉歐起跳
+    function playPortamento(startFreq, endFreq, durationMs) {
+      if (isMuted) return;
+      initAudio();
+
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      const now = audioCtx.currentTime;
+      const dur = durationMs / 1000;
+
+      osc.type = 'square';
+      osc.frequency.setValueAtTime(startFreq, now);
+      osc.frequency.exponentialRampToValueAtTime(Math.max(1, endFreq), now + dur);
+
+      gain.gain.setValueAtTime(0.25, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + dur);
+
+      osc.connect(gain);
+      gain.connect(masterGain);
+
+      osc.start(now);
+      osc.stop(now + dur);
+    }
+
+    // 音符簡譜播放器
+    let activeMelodyTimeout = null;
+    function playMelody(notes, onComplete = null) {
+      stopMelody();
+      let index = 0;
+      function nextNote() {
+        if (index >= notes.length) {
+          if (onComplete) onComplete();
+          return;
+        }
+        const [freq, dur, pause] = notes[index++];
+        if (freq > 0) playTone(freq, dur);
+        activeMelodyTimeout = setTimeout(nextNote, dur + (pause || 20));
+      }
+      nextNote();
+    }
+
+    function stopMelody() {
+      if (activeMelodyTimeout) {
+        clearTimeout(activeMelodyTimeout);
+        activeMelodyTimeout = null;
+      }
+    }
+
+    /* =====================================================================
+     * 3. 點陣圖 Sprite 資源庫 (1-bit Hex)
+     * ===================================================================== */
+    const SPRITES = {
+      // 小恐龍 7x7
+      dinoStand: [0x1F, 0x17, 0x1F, 0x1C, 0x5E, 0x7C, 0x24],
+      dinoRun1:  [0x1F, 0x17, 0x1F, 0x1C, 0x5E, 0x7C, 0x20],
+      dinoRun2:  [0x1F, 0x17, 0x1F, 0x1C, 0x5E, 0x7C, 0x04],
+      // 矮仙人掌 5x4 (小恐龍經典款)
+      cactus:     [0x04, 0x15, 0x0E, 0x04],
+      // 多樣化雲朵群 (大雙峰雲 8x3、中型蓬鬆雲 6x2、迷你小輕雲 4x2)
+      cloudLarge: [0x1C, 0x6E, 0xFF],
+      cloudMed:   [0x0E, 0x3F],
+      cloudSmall: [0x06, 0x0F],
+
+      // 小精靈 7x7 (標準圓形 3-5-7-7-7-5-3，街機 3 圖 4 拍：閉合 -> 半開 -> 大開 -> 半開)
+      pacClose:  [0x1C, 0x3E, 0x7F, 0x7F, 0x7F, 0x3E, 0x1C],
+      pacMid:    [0x1C, 0x3E, 0x7C, 0x70, 0x7C, 0x3E, 0x1C],
+      pacOpen:   [0x1C, 0x38, 0x70, 0x60, 0x70, 0x38, 0x1C],
+      // 幽靈 7x7 (眼睛偏右 0x6D 朝前看 + 固定底部 4 隻腳 0x55，無變形)
+      ghost1:      [0x3E, 0x7F, 0x6D, 0x6D, 0x7F, 0x7F, 0x55],
+      // 受驚嚇幽靈 7x7 (方案 2：反白空心外框 + 內部兩顆發亮小眼珠)
+      ghostScared: [0x3E, 0x41, 0x55, 0x41, 0x41, 0x7F, 0x55],
+      pellet:      [0x02, 0x07, 0x02],
+
+      // 超級瑪利歐 World 1-1 全景地圖物件群 (移除問號磚與蘑菇，改用 3x3 小巧奇數寬實心磚塊使金幣完美居中 + 精緻小巧 5x4 栗寶寶)
+      marioStand:   [0x3C, 0x7F, 0x35, 0x3F, 0x1E, 0x35, 0x3F, 0x63], // 備用角色 (街機 Continue 用)
+      marioBrick:   [0x07, 0x07, 0x07], // 3x3 實心懸空小磚塊 (正中心第 2 格完美對齊 3x4 金幣)
+      marioCoin1:   [0x02, 0x05, 0x05, 0x02], // 3x4 金幣正面 (中空橢圓)
+      marioCoin2:   [0x02, 0x07, 0x07, 0x02], // 3x4 金幣側面轉動
+      marioCoin3:   [0x02, 0x02, 0x02, 0x02], // 3x4 金幣立面細線
+      marioPipeS:   [0x7F, 0x7F, 0x3E, 0x3E], // 7x4 矮水管 (上寬7 下窄5)
+      marioPipeT:   [0x7F, 0x7F, 0x3E, 0x3E, 0x3E, 0x3E], // 7x6 高水管 (上寬7 下窄5)
+      marioGoomba1: [0x0E, 0x1F, 0x0E, 0x08], // 5x4 小巧栗寶寶 (左腳踏步)
+      marioGoomba2: [0x0E, 0x1F, 0x0E, 0x02], // 5x4 小巧栗寶寶 (右腳踏步)
+      marioCastle:  [0x00, 0x2A, 0x3E, 0x14, 0x7F, 0x77, 0x63, 0x63], // 7x8 終點城堡 (垛口 + 雙窗 + 拱門)
+      marioStar1:   [0x04, 0x1F, 0x0E, 0x1B, 0x11], // 5x5 無敵星星 (光芒展開)
+      marioStar2:   [0x04, 0x0E, 0x1F, 0x0E, 0x0A], // 5x5 無敵星星 (收斂閃爍)
+
+      // 太空侵略者 (Space Invaders — 100% 街機原版圖騰：1 號螃蟹怪 11x8 + 3 號烏賊怪 8x8 + 街機散裂爆炸 + 雷射戰機)
+      // 1) 招牌螃蟹怪 (Crab Invader, 11x8 原版像素：長觸角 + 挖空雙眼 + 雙螯上下擺動 + 下顎張合)
+      crab1:     [0x104, 0x088, 0x1FC, 0x376, 0x7FF, 0x5FD, 0x505, 0x0D8], // 雙螯朝下、下顎收合
+      crab2:     [0x104, 0x58A, 0x5FD, 0x777, 0x7FF, 0x3FC, 0x104, 0x202], // 雙螯高舉、外腿踢開
+      // 3) 經典烏賊怪 (Squid Invader, 8x8 原版像素：尖頂頭 + 挖空雙眼 + 觸手張合)
+      squid1:    [0x18, 0x3C, 0x7E, 0xDB, 0xFF, 0x24, 0x5A, 0xA5], // 觸手向外張開
+      squid2:    [0x18, 0x3C, 0x7E, 0xDB, 0xFF, 0x5A, 0x81, 0x42], // 觸手向內彎曲
+      // 街機原版外星怪獸被擊中時的放射狀爆炸火花 (9x8)
+      invExplode:[0x8A, 0x44, 0xA2, 0x11, 0x88, 0x45, 0x22, 0x51],
+      // 左側橫向防護雷射戰機 (6x7：雙翼裝甲 + 駕駛艙 + 中央延伸砲管) & 備用迷你飛船 (星際大戰用)
+      invFighter:[0x30, 0x18, 0x3E, 0x3F, 0x3E, 0x18, 0x30],
+      ship:      [0x04, 0x0E, 0x1F],
+
+      // 5. 寶可夢 Game Boy (Pokemon — 7x7 精緻奇數精靈球 + 4x5 標準字體 + 巨型閃電)
+      // 7x7 精緻奇數精靈球 (小一號，上下各留 1px 呼吸空間：上半實心紅蓋 + 中間挖空橫帶與正中央圓鈕 + 下半空心白底，支援左傾/右傾)
+      pokeBall7M: [0x1C, 0x3E, 0x77, 0x08, 0x63, 0x22, 0x1C], // 正中精靈球 (7x7)
+      pokeBall7L: [0x1C, 0x3E, 0x6F, 0x10, 0x63, 0x22, 0x1C], // 向左搖晃 (按鈕偏左)
+      pokeBall7R: [0x1C, 0x3E, 0x7B, 0x04, 0x63, 0x22, 0x1C], // 向右搖晃 (按鈕偏右)
+      // 7x8 經典巨型閃電圖騰 (Pikachu Lightning Bolt)
+      pokeBoltBig:[0x0E, 0x1C, 0x38, 0x7F, 0x1C, 0x38, 0x30, 0x40],
+      // 5x5 標準清晰像素英文字母庫 (全部統一 w=4 寬度對齊，修正原本 w 不一致導致最高位元左直線被截掉的 bug！)
+      pokeCharP:  [0x0E, 0x09, 0x0E, 0x08, 0x08], // P (4x5)
+      pokeCharI:  [0x0E, 0x04, 0x04, 0x04, 0x0E], // I (4x5)
+      pokeCharK:  [0x09, 0x0A, 0x0C, 0x0A, 0x09], // K (4x5)
+      pokeCharA:  [0x06, 0x09, 0x0F, 0x09, 0x09], // A (4x5)
+      pokeCharG:  [0x07, 0x08, 0x0B, 0x09, 0x07], // G (4x5)
+      pokeCharO:  [0x06, 0x09, 0x09, 0x09, 0x06], // O (4x5)
+      pokeCharT:  [0x0E, 0x04, 0x04, 0x04, 0x04], // T (4x5)
+      pokeCharC:  [0x07, 0x08, 0x08, 0x08, 0x07], // C (4x5)
+      pokeCharH:  [0x09, 0x09, 0x0F, 0x09, 0x09], // H (4x5)
+      pokeCharL:  [0x08, 0x08, 0x08, 0x08, 0x0F], // L (4x5)
+      pokeCharV:  [0x09, 0x09, 0x09, 0x09, 0x06], // V (4x5)
+      pokeCharN:  [0x09, 0x0D, 0x0B, 0x09, 0x09], // N (4x5)
+      pokeCharM:  [0x11, 0x1B, 0x15, 0x11, 0x11], // M (5x5 雙峰清晰大 M)
+      pokeCharR:  [0x0E, 0x09, 0x0E, 0x0A, 0x09], // R (4x5)
+      pokeCharQ:  [0x06, 0x09, 0x02, 0x00, 0x02], // ? (4x5 問號)
+      // 6. 街機 Continue 專用 3x5 緊湊清晰字母庫 (讓完整 "CONTINUE?" 9 個字元 + 右側 7x9 巨型倒數數字同時塞進 42 格畫面！)
+      arcCharC:   [0x07, 0x04, 0x04, 0x04, 0x07], // C (3x5)
+      arcCharO:   [0x07, 0x05, 0x05, 0x05, 0x07], // O (3x5)
+      arcCharN:   [0x05, 0x07, 0x07, 0x05, 0x05], // N (3x5 或 4x5: 0x09,0x0D,0x0B,0x09,0x09)
+      arcCharT:   [0x07, 0x02, 0x02, 0x02, 0x02], // T (3x5)
+      arcCharI:   [0x07, 0x02, 0x02, 0x02, 0x07], // I (3x5)
+      arcCharU:   [0x05, 0x05, 0x05, 0x05, 0x07], // U (3x5)
+      arcCharE:   [0x07, 0x04, 0x07, 0x04, 0x07], // E (3x5)
+      arcCharQ:   [0x07, 0x01, 0x03, 0x00, 0x02], // ? (3x5)
+      // 5x5 街機代幣旋轉 + 投幣孔
+      arcCoin1:   [0x0E, 0x15, 0x15, 0x15, 0x0E], // 5x5 街機代幣正面 (中央投幣立孔)
+      arcCoin2:   [0x04, 0x0E, 0x0E, 0x0E, 0x04], // 5x5 街機代幣側面
+      arcCoin3:   [0x04, 0x04, 0x04, 0x04, 0x04], // 5x5 街機代幣立面細線
+
+      // Windows 藍屏重啟 (BSOD)：7x7 滿版置中側向大哭臉 :( / 大笑臉 :) / 翻轉沙漏 + 3x5 輔助字母
+      bsodSad:    [0x63, 0x66, 0x0C, 0x0C, 0x0C, 0x66, 0x63], // 7x7 經典 Windows 藍屏大哭臉 :( (上下對稱置中 y=1..7 + 2px 加粗哭嘴)
+      bsodHappy:  [0x6C, 0x66, 0x03, 0x03, 0x03, 0x66, 0x6C], // 7x7 重啟成功大笑臉 :) (上下對稱置中 y=1..7 + 2px 加粗笑嘴)
+      bsodHour1:  [0x1F, 0x1B, 0x0E, 0x04, 0x0A, 0x11, 0x1F], // 5x7 沙漏 (上半滿沙)
+      bsodHour2:  [0x1F, 0x11, 0x0E, 0x04, 0x0E, 0x15, 0x1F], // 5x7 沙漏 (沙往下漏)
+      bsodHour3:  [0x1F, 0x11, 0x0A, 0x04, 0x0E, 0x1F, 0x1F], // 5x7 沙漏 (下半集滿)
+      arcCharF:   [0x07, 0x04, 0x07, 0x04, 0x04], // F (3x5)
+      arcCharS:   [0x07, 0x04, 0x07, 0x01, 0x07], // S (3x5)
+      arcCharH:   [0x05, 0x05, 0x07, 0x05, 0x05], // H (3x5)
+
+      heart:     [0x1B, 0x1F, 0x0E, 0x04]   // 貪食蛇 WIN 彩蛋
+    };
+
+    /* =====================================================================
+     * 4. 系統模式狀態機 (Clock / 像素怪獸 / 13 Retro Alarms)
+     * ===================================================================== */
+    let currentMode = 'CLOCK'; // 'CLOCK', 'TAMA', 'ALARM'
+    let currentClockStyle = 'hybrid'; // 'original' | 'hybrid'
+    let activeAlarmTheme = null;
+    let alarmDismissed = false;
+    let animTimer = 0;
+
+    // 鍵盤與按鍵綁定
+    const keys = { k1: false, k2: false, k3: false, k4: false };
+
+    function bindBtn(btnId, keyName) {
+      const el = document.getElementById(btnId);
+      const press = () => {
+        el.classList.add('pressed');
+        handleButtonPress(keyName);
+      };
+      const release = () => el.classList.remove('pressed');
+      el.addEventListener('mousedown', press);
+      el.addEventListener('mouseup', release);
+      el.addEventListener('mouseleave', release);
+      el.addEventListener('touchstart', (e) => { e.preventDefault(); press(); });
+      el.addEventListener('touchend', release);
+    }
+    bindBtn('hwKey1', 'k1');
+    bindBtn('hwKey2', 'k2');
+    bindBtn('hwKey3', 'k3');
+    bindBtn('hwKey4', 'k4');
+
+    window.addEventListener('keydown', (e) => {
+      initAudio();
+      if (e.key === '1' || e.key === 'ArrowLeft') { document.getElementById('hwKey1').classList.add('pressed'); handleButtonPress('k1'); }
+      if (e.key === '2' || e.key === ' ') { document.getElementById('hwKey2').classList.add('pressed'); handleButtonPress('k2'); }
+      if (e.key === '3' || e.key === 'ArrowRight') { document.getElementById('hwKey3').classList.add('pressed'); handleButtonPress('k3'); }
+      if (e.key === '4' || e.key === 'Enter') { document.getElementById('hwKey4').classList.add('pressed'); handleButtonPress('k4'); }
+      if (e.key.toLowerCase() === 'r') triggerRandomAlarm();
+    });
+    window.addEventListener('keyup', (e) => {
+      if (e.key === '1' || e.key === 'ArrowLeft') document.getElementById('hwKey1').classList.remove('pressed');
+      if (e.key === '2' || e.key === ' ') document.getElementById('hwKey2').classList.remove('pressed');
+      if (e.key === '3' || e.key === 'ArrowRight') document.getElementById('hwKey3').classList.remove('pressed');
+      if (e.key === '4' || e.key === 'Enter') document.getElementById('hwKey4').classList.remove('pressed');
+    });
+
+    // 實體按鍵處理總分流
+    function handleButtonPress(k) {
+      playTone(2000, 20); // 實體鍵點擊微嗶反饋
+
+      // 若當前在鬧鐘響起狀態 -> 任一鍵關閉鬧鐘並觸發反轉彩蛋！
+      if (currentMode === 'ALARM' && !alarmDismissed) {
+        dismissAlarm();
+        return;
+      }
+
+      // 像素怪獸模式下的按鍵交互
+      if (currentMode === 'TAMA') {
+        monKey(k);
+      } 
+      // 一般時鐘模式下
+      else if (currentMode === 'CLOCK') {
+        if (k === 'k3') {
+          setClockStyle(currentClockStyle === 'original' ? 'hybrid' : 'original');
+        }
+        if (k === 'k4') switchMode('TAMA');
+      }
+    }
+
+    /* =====================================================================
+     * 5. 像素怪獸養成 (Monster Pet — 原創角色，玩法參考怪獸對打機類型)
+     *
+     * 規則層 (monTickMinute)：每「遊戲分鐘」結算一次數值，與畫面完全分離，日後可逐行移植 ESP32
+     * 表現層 (renderMonster)：最左側 2 條抽象刻度 (x=0..1 飽食、x=3..4 心情) + x=6..41 怪獸活動區；
+     *   需要照顧時頭旁閃小驚嘆號 (生病時與 + 交替)、對應刻度閃爍；詳細數值看 K4 狀態頁
+     * 不懲罰設計：沒有死亡 / 逃家 / 退化；數值最低到 0 只會鬧脾氣與呼叫；生病一針見效；長時間離線最多只補算 24 小時
+     * ===================================================================== */
+    const MON_AREA_X0 = 6, MON_AREA_X1 = 41;
+    const MON_HUNGER_MIN = 45;      // 每 45 遊戲分鐘飽食 -1 (睡覺時減半)
+    const MON_MOOD_MIN = 60;        // 每 60 遊戲分鐘心情 -1 (睡覺時減半)
+    const MON_POOP_MOOD_MIN = 60;   // 便便放著不清：每 60 分鐘額外心情 -1
+    const MON_DIGEST_MEALS = 3;     // 每吃 3 次 (正餐或零食)，30 分鐘後拉一坨便便
+    const MON_EGG_MIN = 2 * 60;          // 蛋 2 小時孵化
+    const MON_CHILD_MIN = 2 * 1440;      // 滿 2 天：幼年期 -> 成長期 (第 3 天起)
+    const MON_ADULT_MIN = 6 * 1440;      // 滿 6 天：成長期 -> 成熟期 (第 7 天起)
+    const MON_ULT_MIN = 13 * 1440;       // 滿 13 天：成熟期 -> 完全體 (第 14 天起，最終型態)
+    const MON_EVOLVE_AT = [MON_EGG_MIN, MON_CHILD_MIN, MON_ADULT_MIN, MON_ULT_MIN]; // 各階段 -> 下一階段的年齡門檻 (分鐘)
+    const MON_STAGE_NAMES = ['蛋', '幼年期', '成長期', '成熟期', '完全體'];
+    const MON_CATCHUP_MAX_MIN = 24 * 60; // 離線補算上限 (關機很久回來不會累積懲罰)
+    const MON_DEX_MAX = 12;              // 圖鑑上限 = 物種數，每種最多養一次
+
+    // 圖元：'#' 亮、'o' 眼睛 (醒著不亮、睡著亮成一條線 = 閉眼)、其他不亮。所有怪獸皆正面，兩幀交替
+    // 只給一幀時，第二幀自動產生 (最底排的腳往外踏一步)
+    const MON_FORMS = {
+      egg: { name: '怪獸蛋', stage: 0, frames: [[
+        '..##..', '.####.', '##.###', '######', '###.##', '.####.', '..##..'
+      ]] },
+      baby: { name: '軟糖球', stage: 1, frames: [[
+        '......', '.####.', '#o##o#', '######', '######', '.#..#.'
+      ], [
+        '......', '......', '.####.', '#o##o#', '######', '##..##'
+      ]] },
+      // 野生對手
+      slime: { name: '野生史萊姆', stage: 2, frames: [[
+        '.......', '.......', '..###..', '.#####.', '#o###o#', '#######', '#.#.#.#'
+      ], [
+        '.......', '.......', '.......', '.#####.', '#o###o#', '#######', '#######'
+      ]] },
+      bat: { name: '野生蝙蝠', stage: 2, frames: [[
+        '#.......#', '##.###.##', '###o#o###', '.#######.', '..#.#.#..', '....#....'
+      ], [
+        '.........', '..#####..', '##o###o##', '#########', '#.#.#.#.#', '....#....'
+      ]] },
+    };
+
+    // 12 種物種 (盲盒)：孵化時從「還沒養過的物種」隨機抽一種，外型從此固定 (照顧方式只影響力量，不影響長相)
+    // 蛋與幼年期 (軟糖球) 共用；每種物種各有成長期 / 成熟期 / 完全體 3 種專屬造型 (寬 <= 12、高 <= 9)
+    const MON_SPECIES = [
+      { name: '角角獸', forms: [
+        ['角角', [['#......#', '.#....#.', '.######.', '##o##o##', '########', '.######.', '.##..##.'],
+                  ['#......#', '.#....#.', '.######.', '##o##o##', '########', '.######.', '##....##']]],
+        ['戰角', [['#........#', '##......##', '.##....##.', '.########.', '##o####o##', '##########', '#.#.##.#.#', '.########.', '.##....##.'],
+                  ['#........#', '##......##', '.##....##.', '.########.', '##o####o##', '##########', '#.#.##.#.#', '.########.', '##......##']]],
+        ['霸角王', ['#..........#', '##........##', '.##......##.', '..########..', '.##o####o##.', '############', '#.##.##.##.#', '.##########.', '.###....###.']],
+      ] },
+      { name: '圓耳熊', forms: [
+        ['圓耳', [['#.....#', '##...##', '#######', '#o###o#', '###.###', '#######', '.#...#.'],
+                  ['#.....#', '##...##', '#######', '#o###o#', '###.###', '#######', '#.....#']]],
+        ['圓滾熊', [['...........', '...#####...', '..#######..', '.##o###o##.', '###########', '####...####', '###########', '.#########.', '..##...##..'],
+                    ['...........', '...........', '...#####...', '.#########.', '##o#####o##', '####...####', '###########', '###########', '.##.....##.']]],
+        ['大熊王', ['##........##', '###......###', '.##########.', '############', '##o######o##', '#####..#####', '###.####.###', '.##########.', '.###....###.']],
+      ] },
+      { name: '天線寶', forms: [
+        ['小天線', ['...##..', '...#...', '.#####.', '#oo#oo#', '#######', '.#####.', '.#...#.']],
+        ['呆天線', [['....##...', '....#....', '..#####..', '.#oo#oo#.', '.#######.', '.##...##.', '..#####..', '..#...#..', '.##...##.'],
+                    ['...##....', '....#....', '..#####..', '.#oo#oo#.', '.#######.', '.##...##.', '..#####..', '..#...#..', '.##...##.']]],
+        ['雙線王', ['.##......##.', '..#......#..', '..########..', '.##oo##oo##.', '.##########.', '###......###', '.##########.', '..#..##..#..', '.##......##.']],
+      ] },
+      { name: '貓耳獸', forms: [
+        ['貓仔', ['.#...#.', '.##.##.', '.#####.', '#o###o#', '.##.##.', '.#####.', '.#...#.']],
+        ['貓耳', [['..#...#..', '..#####..', '.#######.', '.#o###o#.', '.#######.', '#.##.##.#', '#.#####.#', '..#####..', '..##.##..'],
+                  ['..#...#..', '..#####..', '.#######.', '##o###o##', '#.#####.#', '..##.##..', '..#####..', '..#####..', '..##.##..']]],
+        ['尾巴貓王', ['.#.......#..', '.##.....##..', '.#########..', '##o#####o##.', '.####.####..', '#.#######.#.', '..#######..#', '..#######.#.', '..##...##...']],
+      ] },
+      { name: '翼魔', forms: [
+        ['小翼', ['#......#', '##.##.##', '.######.', '.#o##o#.', '..####..', '..#..#..']],
+        ['翼魔', ['#........#', '##..##..##', '###.##.###', '.########.', '..#o##o#..', '..######..', '...####...', '...#..#...']],
+        ['大翼魔王', ['#..........#', '##...##...##', '###..##..###', '####.##.####', '.##########.', '..##o##o##..', '...######...', '...#.##.#...', '..##....##..']],
+      ] },
+      { name: '甲殼龜', forms: [
+        ['小殼', ['..###..', '.#.#.#.', '#######', '#o###o#', '.#####.', '##...##']],
+        ['硬殼龜', ['...####...', '..#.##.#..', '.##.##.##.', '##########', '##o####o##', '.########.', '.##....##.', '##......##']],
+        ['山殼龜王', ['....####....', '..##.##.##..', '.#.##..##.#.', '#.##.##.##.#', '############', '##o######o##', '.##########.', '.###....###.', '###......###']],
+      ] },
+      { name: '火苗獸', forms: [
+        ['小火苗', ['..#...', '..##.#', '.####.', '######', '#o##o#', '######', '.####.']],
+        ['焰火獸', ['....#....', '.#..##.#.', '.##.###..', '..#####..', '.#######.', '##o###o##', '#########', '.#######.', '..##.##..']],
+        ['烈焰王', ['.#...##...#.', '.##.###..##.', '..########..', '.##########.', '##o######o##', '############', '.##.####.##.', '..########..', '..###..###..']],
+      ] },
+      { name: '幽幽', forms: [
+        ['小幽', ['.####.', '######', '#o##o#', '######', '######', '#.##.#']],
+        ['幽靈', ['..#####..', '.#######.', '##o###o##', '#########', '#########', '#########', '#########', '#.#.#.#.#']],
+        ['幽冥王', ['...######...', '.##########.', '###o####o###', '############', '#####..#####', '############', '############', '.##########.', '#.#.#..#.#.#']],
+      ] },
+      { name: '機甲獸', forms: [
+        ['小機甲', ['...#...', '.#####.', '.#o#o#.', '.#####.', '#.###.#', '..#.#..', '.##.##.']],
+        ['機甲兵', ['....#....', '..#####..', '..#o#o#..', '..#####..', '#########', '#.#####.#', '..#####..', '..#...#..', '.##...##.']],
+        ['巨神機甲', ['.#...##...#.', '.#.######.#.', '.#.#o##o#.#.', '.#.######.#.', '############', '#..######..#', '...######...', '...##..##...', '..###..###..']],
+      ] },
+      { name: '啾啾鳥', forms: [
+        ['雛鳥', ['..###..', '.#####.', '.#o#o#.', '#######', '.#####.', '..#.#..']],
+        ['飛羽鳥', ['....##....', '...####...', '..#o##o#..', '.###..###.', '##########', '#.######.#', '..######..', '...#..#...']],
+        ['天空鳥王', ['.....##.....', '...######...', '..##o##o##..', '#####..#####', '############', '.##########.', '#.########.#', '...######...', '...##..##...']],
+      ] },
+      { name: '鯊鰭獸', forms: [
+        ['小鰭', ['...#...', '..###..', '.#####.', '#o###o#', '#######', '.#...#.']],
+        ['利齒鯊', ['....#.....', '...###....', '..######..', '.#o####o#.', '##########', '#.#.#.#.##', '.########.', '.#......#.']],
+        ['深海鯊王', ['.....#......', '....###.....', '..########..', '.##o####o##.', '############', '#.#.#.#.#.##', '############', '.##########.', '.##......##.']],
+      ] },
+      { name: '小飛龍', forms: [
+        ['幼龍', ['.#...#.', '.#####.', '#o###o#', '#######', '.##.##.', '.#####.', '##...##']],
+        ['飛龍', ['#........#', '.#......#.', '..######..', '.#o####o#.', '##########', '.###..###.', '#.######.#', '..######..', '..##..##..']],
+        ['龍王', ['#..........#', '##........##', '.#.######.#.', '..#o####o#..', '############', '#.###..###.#', '#.########.#', '..########..', '.###....###.']],
+      ] },
+    ];
+    // 只給一幀的造型：自動產生第二幀 (最底排左半往左、右半往右踏一步)
+    function monStepFrame(rows) {
+      const last = rows[rows.length - 1], w = last.length, out = Array(w).fill('.');
+      for (let c = 0; c < w; c++) if (last[c] === '#') {
+        const nc = c < w / 2 ? Math.max(0, c - 1) : Math.min(w - 1, c + 1);
+        out[nc] = '#';
+      }
+      return [...rows.slice(0, -1), out.join('')];
+    }
+    const monFormKey = (sp, stage) => `sp${sp}_${stage}`;
+    MON_SPECIES.forEach((sp, i) => sp.forms.forEach(([name, art], k) => {
+      const frames = Array.isArray(art[0]) ? art : [art, monStepFrame(art)];
+      MON_FORMS[monFormKey(i, k + 2)] = { name, stage: k + 2, species: i, frames };
+    }));
+    const MON_ICONS = {
+      // 7x7 大圖示 (泡泡 / 狀態頁)
+      meat:   ['.###...', '#####..', '#####..', '.####..', '...#...', '....##.', '....##.'],
+      cross:  ['..###..', '..###..', '#######', '#######', '#######', '..###..', '..###..'],
+      happy:  ['.#####.', '#.....#', '#.#.#.#', '#.....#', '#.#.#.#', '#..#..#', '.#####.'],
+      neutral:['.#####.', '#.....#', '#.#.#.#', '#.....#', '#.....#', '#.###.#', '.#####.'],
+      sad:    ['.#####.', '#.....#', '#.#.#.#', '#.....#', '#..#..#', '#.#.#.#', '.#####.'],
+      bolt:   ['...##', '..##.', '.##..', '#####', '..##.', '.##..', '##...'],
+      heartF: ['.#.#.', '#####', '#####', '.###.', '..#..'],
+      heartE: ['.#.#.', '#.#.#', '#...#', '.#.#.', '..#..'],
+      // 地上 / 互動物件
+      poop:   ['..#..', '.##..', '.###.', '#####'],
+      food:   ['.##..', '####.', '####.', '..#..', '...##'],   // 5x5 小雞腿 (餵食時掉下來)
+      cake:   ['..#..', '.###.', '#####', '#####'],
+      zee:    ['###', '..#', '.#.', '#..', '###'],
+      bag:    ['.#.', '###', '#.#', '###', '###'],              // 訓練沙包
+      syringe:['.#...', '#####', '.#...'],
+      bang:   ['##', '##', '##', '..', '##'],                   // 2x5 粗驚嘆號 (需要照顧)
+      plus:   ['.#.', '###', '.#.'],                            // 3x3 生病提示 (與驚嘆號交替)
+    };
+    const MON_POOP_W = 6; // 每坨便便至少相隔 6 格 (5 寬 + 1 間隔)
+
+    function drawRows(rows, x, y, opts = {}) {
+      if (!rows.length) return;
+      const w = rows[0].length;
+      for (let r = 0; r < rows.length; r++) {
+        if (opts.opaque) {   // 不透明：先清掉這一排輪廓範圍內的背景 (怪獸站在便便前面不會糊成一團)
+          const line = opts.flip ? [...rows[r]].reverse().join("") : rows[r];
+          const l = line.search(/[#o]/), rr = Math.max(line.lastIndexOf("#"), line.lastIndexOf("o"));
+          for (let c = l; l >= 0 && c <= rr; c++) setPixel(x + c, y + r, 0);
+        }
+        for (let c = 0; c < w; c++) {
+          const ch = rows[r][opts.flip ? w - 1 - c : c];
+          if (ch === '#' || (ch === 'o' && opts.eyesOn)) setPixel(x + c, y + r);
+        }
+      }
+    }
+    const monSize = form => ({ w: MON_FORMS[form].frames[0][0].length, h: MON_FORMS[form].frames[0].length });
+    function drawMonster(form, x, frameIdx, opts = {}) {
+      const f = MON_FORMS[form].frames;
+      const rows = f[frameIdx % f.length];
+      drawRows(rows, x, ROWS - rows.length + (opts.dy || 0), opts);
+    }
+
+    // ---------------------------------------------------------------------
+    // 狀態 (MON = 需存檔，模擬 NVS) + 表現層暫態 (monView)
+    // ---------------------------------------------------------------------
+    const MON_SAVE_KEY = 'kortlinje_monster_v2';   // v2：圖鑑 (多隻怪獸)；舊的 v1 單隻存檔不沿用
+    function monNewEgg(clock) {
+      return {
+        form: 'egg', species: -1, ageMin: 0, clock,     // clock = 寵物世界時間 (ms)，模擬器可快轉；species 孵化時才決定
+        hunger: 4, mood: 4, power: 0, poop: 0, sick: false,
+        hungerAcc: 0, moodAcc: 0, poopAcc: 0, hungerZeroMin: 0, poopLongMin: 0,
+        digest: 0, poopTimer: -1, poopXs: [],             // poopXs = 每坨便便的 x 位置 (長度即便便數)
+        trains: 0, wins: 0, losses: 0, snacks: 0, meals: 0,
+        pendingForm: null,                              // 等待播放的孵化 / 進化
+      };
+    }
+    // 圖鑑：所有養過的怪獸 (含目前這隻)，依養的先後排列；同一時間只有 MON (= DEX[monActive]) 在過日子，其他時間暫停
+    let DEX = [monNewEgg(Date.now())];
+    let monActive = 0;
+    let MON = DEX[0];
+    const monStageOf = m => MON_FORMS[m.form].stage;
+    // 可以養下一隻：圖鑑裡每一隻都已長到完全體，且還有沒養過的物種
+    const monCanNewEgg = () => DEX.length < MON_DEX_MAX && DEX.every(m => monStageOf(m) === 4);
+    function monPickSpecies() {
+      const owned = new Set(DEX.map(m => m.species));
+      const pool = MON_SPECIES.map((_, i) => i).filter(i => !owned.has(i));
+      return pool.length ? pool[Math.floor(Math.random() * pool.length)] : Math.floor(Math.random() * MON_SPECIES.length);
+    }
+    function monResetView() {
+      Object.assign(monView, { x: 24, dir: 1, nextStep: 0, pauseUntil: 0, target: undefined, action: null, statusPage: -1, challenge: null, called: false });
+    }
+    // 切換到圖鑑裡的第 i 隻：世界時間延續，被收起來的那隻時間暫停
+    function monSwitchTo(i) {
+      if (i === monActive || !DEX[i]) return;
+      DEX[i].clock = MON.clock;
+      monActive = i; MON = DEX[i];
+      monResetView();
+      monSave(); monUpdateUI();
+    }
+    function monStartNewEgg() {
+      if (!monCanNewEgg()) return;
+      DEX.push(monNewEgg(MON.clock));
+      monActive = DEX.length - 1; MON = DEX[monActive];
+      monResetView();
+      playMelody([[523, 80, 20], [784, 80, 20], [1047, 160, 0]]);
+      monSave(); monUpdateUI();
+    }
+    let monSpeed = 60;                 // 模擬器快轉倍率 (遊戲 ms / 真實 ms)
+    let monLastReal = 0;
+    let monSoundOn = true;
+    const monView = {
+      x: 24, dir: 1, nextStep: 0, pauseUntil: 0,
+      action: null,                    // { type, start, ... }
+      statusPage: -1, statusUntil: 0,
+      shelf: { sel: 0, detail: false }, // 圖鑑書架：目前選中的項目、是否在看單隻資料
+      challenge: null,                 // { enemy, until }
+      lastCall: -1e9, called: false,
+    };
+
+    function monSave() {
+      try { localStorage.setItem(MON_SAVE_KEY, JSON.stringify({ dex: DEX, active: monActive, savedAt: Date.now() })); } catch (e) {}
+    }
+    function monLoad() {
+      try {
+        const raw = localStorage.getItem(MON_SAVE_KEY);
+        if (!raw) return;
+        const d = JSON.parse(raw);
+        if (!d || !Array.isArray(d.dex) || !d.dex.length || d.dex.some(m => !m || !MON_FORMS[m.form])) return;
+        DEX = d.dex.slice(0, MON_DEX_MAX).map(m => Object.assign(monNewEgg(m.clock), m));
+        monActive = Math.max(0, Math.min(DEX.length - 1, d.active | 0));
+        MON = DEX[monActive];
+        if (!Array.isArray(MON.poopXs) || MON.poopXs.length !== MON.poop) { const n = MON.poop; MON.poopXs = []; for (let i = 0; i < n; i++) monAddPoop(); }
+        // 離線補算：以真實經過時間推進寵物世界，最多 24 小時
+        const offMin = Math.min(MON_CATCHUP_MAX_MIN, Math.floor((Date.now() - d.savedAt) / 60000));
+        for (let i = 0; i < offMin; i++) monTickMinute(true);
+        MON.clock = Math.max(MON.clock, Date.now());
+      } catch (e) {}
+    }
+
+    const monHour = () => new Date(MON.clock).getHours();
+    const monIsNight = () => { const h = monHour(); return h >= 23 || h < 7; };
+    const monStage = () => MON_FORMS[MON.form].stage;
+    const monSleeping = () => monStage() > 0 && monIsNight();
+    const monNeeds = () => ({ hungry: MON.hunger === 0, sad: MON.mood === 0, poop: MON.poop > 0, sick: MON.sick });
+    const monHasNeed = () => { const n = monNeeds(); return n.hungry || n.sad || n.poop || n.sick; };
+
+    // ---------------------------------------------------------------------
+    // 規則層：每遊戲分鐘結算 (silent = 離線補算，不發聲、不排動畫)
+    // ---------------------------------------------------------------------
+    function monTickMinute(silent = false) {
+      MON.clock += 60000;
+      MON.ageMin++;
+      if (MON.form === 'egg') {
+        if (MON.ageMin >= MON_EGG_MIN && !MON.pendingForm) { MON.pendingForm = 'baby'; MON.species = monPickSpecies(); } // 盲盒：孵化時決定物種
+        return;
+      }
+      const rate = monSleeping() ? 0.5 : 1;
+
+      MON.hungerAcc += rate;
+      if (MON.hungerAcc >= MON_HUNGER_MIN) { MON.hungerAcc -= MON_HUNGER_MIN; if (MON.hunger > 0) MON.hunger--; }
+      MON.moodAcc += rate;
+      if (MON.moodAcc >= MON_MOOD_MIN) { MON.moodAcc -= MON_MOOD_MIN; if (MON.mood > 0) MON.mood--; }
+
+      // 消化 -> 便便 (吃滿 3 次的那一分鐘開始算，30 分鐘後拉出來)
+      if (MON.poopTimer < 0 && MON.digest >= MON_DIGEST_MEALS) { MON.digest -= MON_DIGEST_MEALS; MON.poopTimer = 30; }
+      if (MON.poopTimer > 0 && --MON.poopTimer === 0) { monAddPoop(); MON.poopTimer = -1; }
+
+      // 便便放著：心情額外下降；放太久或餓太久 -> 生病 (一針就好)
+      // 睡覺時主人無法照顧，生病計時暫停 (保留已累計的時間，醒來後繼續算)
+      const sleeping = monSleeping();
+      if (MON.poop > 0) {
+        MON.poopAcc += rate;
+        if (MON.poopAcc >= MON_POOP_MOOD_MIN) { MON.poopAcc -= MON_POOP_MOOD_MIN; if (MON.mood > 0) MON.mood--; }
+        MON.poopLongMin = MON.poop >= 2 ? MON.poopLongMin + (sleeping ? 0 : 1) : 0;
+      } else { MON.poopAcc = 0; MON.poopLongMin = 0; }
+      MON.hungerZeroMin = MON.hunger === 0 ? MON.hungerZeroMin + (sleeping ? 0 : 1) : 0;
+      if (!MON.sick && (MON.poopLongMin >= 120 || MON.hungerZeroMin >= 180)) MON.sick = true;
+
+      // 進化 (外型由物種決定；等醒著且沒在做動作時才播動畫)
+      const st = monStage();
+      if (!MON.pendingForm && st >= 1 && st <= 3 && MON.ageMin >= MON_EVOLVE_AT[st]) MON.pendingForm = monFormKey(MON.species, st + 1);
+
+      // 野生挑戰：白天、成長期以上、健康時，平均約每 4 小時一次
+      if (!silent && monStage() >= 2 && !monSleeping() && !MON.sick && !monView.challenge && !monView.action && Math.random() < 1 / 240) {
+        monView.challenge = { enemy: Math.random() < 0.5 ? 'slime' : 'bat', until: performance.now() + 20000 };
+        if (monAutoSfx()) playMelody([[880, 60, 40], [880, 60, 40], [1320, 120, 0]]);
+      }
+    }
+    // 在地上隨機找一個不與其他便便重疊的位置拉一坨 (最多 3 坨)
+    function monAddPoop() {
+      if (MON.poop >= 3) return;
+      let x = MON_AREA_X0;
+      for (let tries = 0; tries < 30; tries++) {
+        x = MON_AREA_X0 + 2 + Math.floor(Math.random() * (MON_AREA_X1 - 4 - MON_AREA_X0 - 1)); // 與左側刻度保持距離
+        if (MON.poopXs.every(p => Math.abs(p - x) >= MON_POOP_W)) break;
+      }
+      MON.poopXs.push(x);
+      MON.poop = MON.poopXs.length;
+    }
+
+    // ---------------------------------------------------------------------
+    // 互動 (暫定按鍵：K1 餵正餐、K2 訓練 / 接受挑戰、K3 打掃 / 打針、K4 狀態頁)
+    // ---------------------------------------------------------------------
+    const monBusy = () => !!monView.action;
+    const monAutoSfx = () => monSoundOn && currentMode !== 'ALARM'; // 寵物自動發出的聲音 (呼叫 / 挑戰 / 進化) 不可蓋過鬧鐘
+    function monStartAction(type, extra = {}) {
+      monView.action = Object.assign({ type, start: performance.now() }, extra);
+    }
+    function monFeed(snack = false) {
+      if (monBusy() || monStage() === 0 || monSleeping()) return;
+      if (!snack && MON.hunger >= 4) { monStartAction('refuse'); playTone(300, 120); return; }
+      if (snack) { MON.mood = Math.min(4, MON.mood + 1); MON.snacks++; }
+      else { MON.hunger = Math.min(4, MON.hunger + 1); MON.meals++; }
+      MON.digest++;
+      monStartAction('eat', { item: snack ? 'cake' : 'food' });   // 5x5 小雞腿 / 蛋糕
+      playMelody([[800, 40, 120], [800, 40, 120], [1000, 60, 0]]);
+      monSave();
+    }
+    function monTrain() {
+      if (monView.challenge) {   // 接受挑戰 (動作播放中按下不算，挑戰繼續等待)
+        if (monBusy()) return;
+        monStartBattle(monView.challenge.enemy); monView.challenge = null; return;
+      }
+      const a = monView.action;
+      if (a && a.type === 'train' && a.phase === 'aim') {       // 第二次按：出拳
+        const lvl = monTrainLevel(performance.now() - a.start);
+        a.phase = 'shoot'; a.shootAt = performance.now(); a.ok = lvl >= 7; a.lvl = lvl;
+        MON.trains++;
+        if (a.ok) { MON.power = Math.min(99, MON.power + 1); MON.mood = Math.min(4, MON.mood + 1); }
+        playPortamento(500, a.ok ? 1500 : 300, 200);
+        monSave();
+        return;
+      }
+      if (monBusy() || monStage() === 0 || monSleeping()) return;
+      if (MON.sick) { playTone(300, 120); monStartAction('refuse'); return; }
+      monStartAction('train', { phase: 'aim' });
+    }
+    const monTrainLevel = ms => { const p = (ms % 1000) / 1000; return Math.round((p < 0.5 ? p * 2 : 2 - p * 2) * 9); };
+    function monClean() {
+      if (monBusy() || monStage() === 0) return;
+      if (MON.poop > 0) {
+        monStartAction('clean', { poopBefore: MON.poopXs.slice() });
+        MON.poop = 0; MON.poopXs = []; MON.poopAcc = 0; MON.poopLongMin = 0;
+        playPortamento(1800, 400, 400);
+      } else if (MON.sick) {
+        monStartAction('medicine');
+        MON.sick = false; MON.hungerZeroMin = 0;
+        playMelody([[1200, 60, 40], [1500, 60, 40], [1800, 120, 0]]);
+      } else { playTone(600, 40); return; }
+      monSave();
+    }
+    const MON_STATUS_PAGES = 6;          // 飽食 → 心情 → 力量 → 天數 → 戰績 → 圖鑑書架 → 返回
+    const MON_SHELF_PAGE = 5;
+    const MON_SHELF_IDLE_MS = 8000;      // 書架要挑選，給比較長的無操作返回時間
+    function monStatus() {
+      if (monView.action && monView.action.type !== 'status') return;
+      monView.statusPage = monView.statusPage + 1;
+      if (monView.statusPage >= MON_STATUS_PAGES) monView.statusPage = -1;
+      if (monView.statusPage === MON_SHELF_PAGE) monView.shelf = { sel: monActive, detail: false };
+      monView.statusUntil = performance.now() + (monView.statusPage === MON_SHELF_PAGE ? MON_SHELF_IDLE_MS : 4000);
+    }
+    // 書架項目：圖鑑裡每一隻 + (可以養下一隻時) 最右邊一顆新蛋
+    const monShelfItems = () => monCanNewEgg() ? [...DEX, 'newEgg'] : DEX;
+    // 書架操作：K1 左、K3 右、K2 看資料 → 再按 K2 換牠出來養 (或孵新蛋)、K4 離開
+    function monShelfKey(k) {
+      const sh = monView.shelf, items = monShelfItems();
+      monView.statusUntil = performance.now() + MON_SHELF_IDLE_MS;
+      if (k === 'k4') { monView.statusPage = -1; return; }
+      if (k === 'k1' || k === 'k3') {
+        if (sh.detail) { sh.detail = false; return; }
+        const ns = sh.sel + (k === 'k1' ? -1 : 1);
+        if (ns >= 0 && ns < items.length) { sh.sel = ns; playTone(1000, 20); }
+        return;
+      }
+      if (k === 'k2') {
+        if (!sh.detail) { sh.detail = true; playTone(1200, 30); return; }
+        const it = items[sh.sel];
+        monView.statusPage = -1;
+        if (it === 'newEgg') monStartNewEgg();
+        else if (sh.sel !== monActive) { monSwitchTo(sh.sel); playMelody([[784, 60, 20], [1047, 120, 0]]); }
+      }
+    }
+    function monKey(k) {
+      if (monView.statusPage === MON_SHELF_PAGE) { monShelfKey(k); monUpdateUI(); return; }
+      if (monView.statusPage >= 0 && k !== 'k4') monView.statusPage = -1;
+      if (k === 'k1') monFeed(false);
+      if (k === 'k2') monTrain();
+      if (k === 'k3') monClean();
+      if (k === 'k4') monStatus();
+      monUpdateUI();
+    }
+
+    // 對戰：開打時一次決定整場回合 (勝負依力量 + 階段 + 隨機)
+    // 對手強度只跟階段有關 (與我方力量無關)，所以訓練越多力量越高、勝率越高
+    const MON_ENEMY_POWER = [[0, 0], [0, 10], [0, 20], [5, 45], [15, 75]];   // 各階段野生對手的力量範圍 [最小, 最大]
+    const MON_STAGE_BONUS = [0, 0, 10, 25, 40];                               // 各階段攻擊力加成 (我方與對手相同)
+    function monStartBattle(enemy) {
+      if (monBusy() || monStage() < 1) return;
+      const stageBonus = MON_STAGE_BONUS[monStage()];
+      const pAtk = MON.power + stageBonus;
+      const [eMin, eMax] = MON_ENEMY_POWER[monStage()];
+      const eAtk = stageBonus + eMin + Math.floor(Math.random() * (eMax - eMin + 1));
+      const pHit = Math.max(0.25, Math.min(0.85, 0.55 + (pAtk - eAtk) / 60));
+      const eHit = Math.max(0.25, Math.min(0.85, 0.55 + (eAtk - pAtk) / 60));
+      const turns = [];
+      let php = 3, ehp = 3, me = true;
+      while (php > 0 && ehp > 0 && turns.length < 14) {
+        const hit = Math.random() < (me ? pHit : eHit);
+        turns.push({ me, hit });
+        if (hit) { if (me) ehp--; else php--; }
+        me = !me;
+      }
+      const win = ehp <= 0 || (php > 0 && ehp <= php);
+      monStartAction('battle', { enemy, turns, win, done: false });
+      playPortamento(200, 900, 300);
+    }
+    const MON_BATTLE_INTRO = 900, MON_TURN_MS = 900, MON_BATTLE_END = 2200;
+
+    // ---------------------------------------------------------------------
+    // 每幀更新 (不論目前顯示哪個模式，寵物世界都在走)
+    // ---------------------------------------------------------------------
+    function monUpdate(nowMs) {
+      if (!monLastReal) monLastReal = nowMs;
+      const dt = Math.min(1000, nowMs - monLastReal);
+      monLastReal = nowMs;
+      monAdvanceGameMs(dt * monSpeed);
+
+      const a = monView.action;
+      if (a) {
+        const t = nowMs - a.start;
+        const dur = { eat: 1600, refuse: 900, clean: 1300, medicine: 1500, hatch: 2600, evolve: 3200 }[a.type];
+        if (dur && t >= dur) monView.action = null;
+        if (a.type === 'train' && ((a.phase === 'aim' && t > 5000) || (a.phase === 'shoot' && nowMs - a.shootAt > 1100))) {
+          if (a.phase === 'aim') MON.trains++;   // 逾時 = 沒打中
+          monView.action = null;
+        }
+        if (a.type === 'battle') {
+          const endT = MON_BATTLE_INTRO + a.turns.length * MON_TURN_MS;
+          if (!a.done && t >= endT) {
+            a.done = true;
+            if (a.win) { MON.wins++; MON.mood = Math.min(4, MON.mood + 1); MON.power = Math.min(99, MON.power + 1); }
+            else MON.losses++;
+            playMelody(a.win ? [[784, 90, 20], [988, 90, 20], [1319, 200, 0]] : [[392, 160, 30], [330, 160, 30], [262, 300, 0]]);
+            monSave();
+          }
+          if (t >= endT + MON_BATTLE_END) monView.action = null;
+        }
+      }
+      if (monView.challenge && nowMs > monView.challenge.until) monView.challenge = null;
+      if (monView.statusPage >= 0 && nowMs > monView.statusUntil) monView.statusPage = -1;
+
+      // 孵化 / 進化：醒著且空閒時播放
+      if (MON.pendingForm && !monView.action && (MON.form === 'egg' || !monSleeping())) {
+        const from = MON.form;
+        MON.form = MON.pendingForm; MON.pendingForm = null;
+        monStartAction(from === 'egg' ? 'hatch' : 'evolve', { from });
+        if (monAutoSfx()) playMelody([[523, 100, 20], [659, 100, 20], [784, 100, 20], [1047, 300, 0]]);
+        monSave();
+        monUpdateUI();
+      }
+
+      // 呼叫：白天出現新需求時響一次「嗶-波」×3 (真實時間至少間隔 10 秒)
+      const need = monHasNeed() && monStage() > 0;
+      if (need && !monSleeping() && !monView.called && nowMs - monView.lastCall > 10000) {
+        monView.called = true; monView.lastCall = nowMs;
+        if (monAutoSfx()) playMelody([[1200, 100, 40], [2400, 140, 100], [1200, 100, 40], [2400, 140, 100], [1200, 100, 40], [2400, 140, 0]]);
+      }
+      if (!need) monView.called = false;
+    }
+    let monGameMsAcc = 0;
+    function monAdvanceGameMs(ms) {
+      monGameMsAcc += ms;
+      let n = 0;
+      while (monGameMsAcc >= 60000) {
+        monGameMsAcc -= 60000;
+        monTickMinute();
+        if (++n % 60 === 0) monSave();
+      }
+      if (n) { monSave(); monUpdateUI(); }
+    }
+    function monSkipMinutes(min) {
+      for (let i = 0; i < min; i++) monTickMinute();
+      monSave(); monUpdateUI();
+    }
+    function monJumpToHour(h, m) {
+      const d = new Date(MON.clock);
+      let target = new Date(d.getFullYear(), d.getMonth(), d.getDate(), h, m).getTime();
+      if (target <= MON.clock) target += 86400000;
+      monSkipMinutes(Math.round((target - MON.clock) / 60000));
+    }
+
+    // ---------------------------------------------------------------------
+    // 表現層
+    // ---------------------------------------------------------------------
+    function monIdleStep(nowMs, w) {
+      const v = monView;
+      const maxX = MON_AREA_X1 - w + 1;
+      v.x = Math.max(MON_AREA_X0, Math.min(maxX, v.x));
+      const sad = MON.hunger === 0 || MON.mood === 0;
+      if (monSleeping() || sad || nowMs < v.pauseUntil || nowMs < v.nextStep) return;
+      if (v.target === undefined || v.target === v.x || v.target > maxX) {
+        if (v.target === v.x) { v.target = undefined; v.pauseUntil = nowMs + 300 + Math.random() * 900; return; } // 到點：停一下
+        v.target = MON_AREA_X0 + Math.floor(Math.random() * (maxX - MON_AREA_X0 + 1));                           // 挑下一個目標點
+      }
+      v.dir = Math.sign(v.target - v.x) || v.dir;
+      v.x += v.dir;
+      v.nextStep = nowMs + (MON.sick ? 700 : 200);
+      if (!MON.sick && MON.mood >= 3 && Math.random() < 0.04) v.hopUntil = nowMs + 180;                          // 心情好：偶爾蹦一下
+    }
+
+    // 最左側抽象刻度：x=0..1 飽食、x=3..4 心情，每 1 點 = 2 排 (由下往上，滿格 8 排)
+    // 剩 1 點或 0 時底部一格閃爍 (提早提醒；驚嘆號仍是數值 0 才出現)
+    function drawMonGauges(nowMs) {
+      const blink = Math.floor(nowMs / 300) % 2 === 0;
+      const gauge = (x, val) => {
+        for (let i = 0; i < val; i++) for (let y = 7 - i * 2; y <= 8 - i * 2; y++) { setPixel(x, y); setPixel(x + 1, y); }
+        if (val <= 1) for (let y = 7; y <= 8; y++) { setPixel(x, y, blink); setPixel(x + 1, y, blink); }
+      };
+      gauge(0, MON.hunger);
+      gauge(3, MON.mood);
+    }
+
+    function renderMonster(nowMs) {
+      const a = monView.action;
+      // 全螢幕：狀態頁 / 對戰
+      if (monView.statusPage === MON_SHELF_PAGE) { renderMonShelf(nowMs); return; }
+      if (monView.statusPage >= 0) {
+        const p = monView.statusPage;
+        const hearts = n => { for (let i = 0; i < 4; i++) drawRows(i < n ? MON_ICONS.heartF : MON_ICONS.heartE, 11 + i * 7, 2); };
+        if (p === 0) { drawRows(MON_ICONS.meat, 1, 1); hearts(MON.hunger); }
+        if (p === 1) { drawRows(MON.mood >= 3 ? MON_ICONS.happy : MON.mood >= 1 ? MON_ICONS.neutral : MON_ICONS.sad, 1, 1); hearts(MON.mood); }
+        if (p === 2) { drawRows(MON_ICONS.bolt, 2, 1); drawText(String(MON.power), 11, 2); }
+        if (p === 3) drawTextCentered(`DAY ${Math.floor(MON.ageMin / 1440) + 1}`, 2);
+        if (p === 4) drawTextCentered(`W${MON.wins} L${MON.losses}`, 2);
+        for (let i = 0; i < MON_STATUS_PAGES; i++) if (i === p || Math.floor(nowMs / 400) % 2) setPixel(COLS - 1 - (MON_STATUS_PAGES - 1 - i) * 2, 8); // 右下角頁碼 (目前頁恆亮、其他閃)
+        return;
+      }
+      if (a && a.type === 'battle') { renderMonBattle(nowMs, a); return; }
+
+      drawMonGauges(nowMs);
+      const { w } = monSize(MON.form);
+      const v = monView;
+      const t = a ? nowMs - a.start : 0;
+      const frameMs = MON.sick ? 1000 : (monSleeping() ? 1e9 : 500);
+      let frame = Math.floor(nowMs / frameMs) % 2;
+
+      // 便便 (地上隨機位置，最多 3 坨)
+      if (a && a.type === 'clean') {
+        const waveX = MON_AREA_X0 + Math.floor(t / 1300 * (MON_AREA_X1 - MON_AREA_X0 + 3));
+        for (const px of a.poopBefore) if (px > waveX) drawRows(MON_ICONS.poop, px, 5);
+        for (let y = 0; y < ROWS; y++) if ((y + Math.floor(t / 60)) % 2 === 0) setPixel(waveX, y);   // 沖水波
+        setPixel(waveX - 1, 8); setPixel(waveX - 2, 7);
+      } else {
+        for (const px of MON.poopXs) drawRows(MON_ICONS.poop, px, 5);
+      }
+
+      if (MON.form === 'egg') {
+        const wobble = Math.floor(nowMs / 400) % 4;
+        const ex = 18 + (wobble === 1 ? 1 : wobble === 3 ? -1 : 0);
+        drawMonster('egg', ex, 0);
+        return;
+      }
+      if (a && a.type === 'hatch') {
+        if (t < 1600) {   // 蛋越晃越快 -> 裂開
+          const sp = t < 800 ? 160 : 80;
+          const ex = 18 + ((Math.floor(t / sp) % 2) ? 1 : -1);
+          drawMonster('egg', ex, 0);
+          if (t > 1000) { setPixel(ex + 2, 3, 0); setPixel(ex + 3, 4, 0); setPixel(ex + 2, 5, 0); }
+        } else if (t < 1800) { for (let y = 0; y < ROWS; y++) drawLine(MON_AREA_X0, y, MON_AREA_X1, y); }
+        else { v.x = 18; drawMonster(MON.form, v.x, 0); monSparkle(nowMs, v.x, w); }
+        return;
+      }
+      if (a && a.type === 'evolve') {
+        const fromW = monSize(a.from).w;
+        if (t < 2200) {   // 新舊型態交替閃爍，越來越快
+          const sp = t < 1000 ? 250 : t < 1700 ? 120 : 60;
+          const showNew = Math.floor(t / sp) % 2 === 1;
+          const cx = v.x + Math.floor(fromW / 2);
+          const form = showNew ? MON.form : a.from;
+          drawMonster(form, cx - Math.floor(monSize(form).w / 2), 0);
+        } else if (t < 2400) { for (let y = 0; y < ROWS; y++) drawLine(MON_AREA_X0, y, MON_AREA_X1, y); }
+        else {
+          if (!a.recentred) { a.recentred = true; v.x = Math.max(MON_AREA_X0, Math.min(MON_AREA_X1 - w + 1, v.x + Math.floor((fromW - w) / 2))); } // 只置中一次
+          drawMonster(MON.form, v.x, 0); monSparkle(nowMs, v.x, w);
+        }
+        return;
+      }
+
+      // 訓練：左側怪獸、右側沙包、最右側力量條
+      if (a && a.type === 'train') {
+        const mx = MON_AREA_X0 + 1;
+        const lvl = a.phase === 'aim' ? monTrainLevel(t) : a.lvl;
+        for (let i = 0; i < lvl; i++) setPixel(MON_AREA_X1, 8 - i);
+        setPixel(MON_AREA_X1 - 1, 2); // 成功門檻刻度 (>= 7)
+        const bagX = 34;
+        if (a.phase === 'aim') {
+          drawMonster(MON.form, mx, Math.floor(nowMs / 200) % 2);
+          drawRows(MON_ICONS.bag, bagX, 4);
+        } else {
+          const st = nowMs - a.shootAt;
+          drawMonster(MON.form, mx, 0, { dy: a.ok && st > 500 ? -(Math.floor(st / 120) % 2) : 0 });
+          const bx = mx + w + Math.floor(st / 25);
+          const reach = bagX - 2;
+          if (bx < reach) { setPixel(bx, 5); setPixel(bx + 1, 5); setPixel(bx, 6); setPixel(bx + 1, 6); }
+          else if (!a.ok) { const drop = Math.floor((st - (reach - mx - w) * 25) / 60); setPixel(reach, Math.min(8, 6 + drop)); }
+          if (!a.ok || bx < reach) drawRows(MON_ICONS.bag, bagX, 4);
+          else if (Math.floor(st / 100) % 2 === 0) { setPixel(bagX - 1, 3); setPixel(bagX + 3, 3); setPixel(bagX - 1, 8); setPixel(bagX + 3, 8); setPixel(bagX + 1, 2); }
+        }
+        return;
+      }
+
+      // 一般 / 進食 / 拒絕 / 打針
+      monIdleStep(nowMs, w);
+      let x = v.x, opts = { eyesOn: monSleeping(), opaque: true, dy: (v.hopUntil || 0) > nowMs && !a ? -1 : 0 };
+      if (a && a.type === 'eat') {
+        frame = Math.floor(t / 150) % 2;
+        const item = MON_ICONS[a.item];
+        const fx = v.dir > 0 ? Math.min(MON_AREA_X1 - 4, x + w + 1) : Math.max(MON_AREA_X0, x - 6);
+        const bites = Math.min(item.length, Math.floor(t / 450) * 2);   // 分 3 口，每口吃掉上方 2 排
+        const fy = Math.min(ROWS - item.length, Math.floor(t / 40) - 5); // 從上方掉下
+        drawRows(item.slice(bites), fx, fy + bites);
+      }
+      if (a && a.type === 'refuse') { x += (Math.floor(t / 110) % 2) ? 1 : -1; frame = 0; }
+      if (a && a.type === 'medicine') {
+        const sx = Math.max(x + w + 1, MON_AREA_X1 - 4 - Math.floor(t / 40));
+        if (t < 900) drawRows(MON_ICONS.syringe, sx, 4);
+        if (t >= 900 && Math.floor(t / 100) % 2 === 0) { monSparkle(nowMs, x, w); }
+      }
+      if (MON.hunger === 0 || MON.mood === 0) frame = 1;   // 鬧脾氣：趴著不動
+      drawMonster(MON.form, x, frame, opts);
+
+      // 睡覺：兩個 3x5 的 Z 輪流往右上冒出
+      if (monSleeping()) {
+        const zx = x + w + 8 <= MON_AREA_X1 ? x + w + 1 : x - 8;
+        if (Math.floor(nowMs / 700) % 2 === 0) drawRows(MON_ICONS.zee, zx, 4);
+        else drawRows(MON_ICONS.zee, zx + 4, 1);
+      } else {
+        if ((MON.hunger === 0 || MON.mood === 0) && Math.floor(nowMs / 500) % 2 === 0) {
+          setPixel(x - 1, ROWS - monSize(MON.form).h + 4);   // 淚滴
+        }
+        // 需要照顧：頭旁閃 2x5 粗驚嘆號 (生病時與 3x3 + 交替)
+        if (monHasNeed() && !a && !monView.challenge) {
+          const ph = Math.floor(nowMs / 300) % 4;            // 0,1 = 驚嘆號、2 = 生病時顯示 +、3 = 暗
+          const hx = x + w + 4 <= MON_AREA_X1 + 1 ? x + w + 1 : x - 4;
+          const hy = Math.max(0, ROWS - monSize(MON.form).h);
+          if (ph < 2 || (ph === 2 && !MON.sick)) drawRows(MON_ICONS.bang, hx, hy);
+          else if (ph === 2) drawRows(MON_ICONS.plus, hx, hy + 1);
+        }
+      }
+      if (monView.challenge && !a) {
+        const ch = monView.challenge;
+        const ew = monSize(ch.enemy).w;
+        if (Math.floor(nowMs / 250) % 2 === 0) drawMonster(ch.enemy, MON_AREA_X1 - Math.floor(ew / 2), 0);
+        if (Math.floor(nowMs / 250) % 2 === 1) { drawLine(MON_AREA_X1 - 1, 0, MON_AREA_X1 - 1, 2); setPixel(MON_AREA_X1 - 1, 4); } // !
+      }
+    }
+    // 圖鑑書架：一次並排 3 隻 (每格 14 寬)，選中的那隻閃爍；左右邊緣小點 = 那一側還有更多
+    // 按 K2 進入單隻資料：左邊大圖、右邊養的天數 D 與勝場 W (目前在養的那隻會跳)；新蛋顯示 NEW
+    function renderMonShelf(nowMs) {
+      const sh = monView.shelf, items = monShelfItems();
+      sh.sel = Math.max(0, Math.min(items.length - 1, sh.sel));
+      const blink = Math.floor(nowMs / 300) % 2 === 0;
+      const formOf = it => it === 'newEgg' ? 'egg' : it.form;
+      if (sh.detail) {
+        const it = items[sh.sel];
+        if (it === 'newEgg') {
+          drawMonster('egg', 4 + (blink ? 1 : -1), 0, { dy: -1 });
+          if (blink) drawText('NEW', 16, 2);
+          return;
+        }
+        const active = sh.sel === monActive;
+        drawMonster(it.form, 1, active ? Math.floor(nowMs / 500) % 2 : 0, { dy: active && blink ? -1 : 0 });
+        drawText('D' + (Math.floor(it.ageMin / 1440) + 1), 15, 2);
+        drawText('W' + it.wins, 28, 2);
+        return;
+      }
+      const start = Math.max(0, Math.min(items.length - 3, sh.sel - 1));
+      for (let k = 0; k < 3; k++) {
+        const idx = start + k, it = items[idx];
+        if (!it || (idx === sh.sel && !blink)) continue;
+        const f = formOf(it), { w } = monSize(f);
+        drawMonster(f, k * 14 + Math.floor((14 - w) / 2), 0, { dy: f === 'egg' ? -1 : 0 });
+      }
+      if (start > 0) setPixel(0, 4);
+      if (start + 3 < items.length) setPixel(COLS - 1, 4);
+    }
+    function monSparkle(nowMs, x, w) {
+      if (Math.floor(nowMs / 150) % 2) { setPixel(x - 2, 1); setPixel(x + w + 1, 2); setPixel(x + Math.floor(w / 2), 0); }
+      else { setPixel(x - 1, 3); setPixel(x + w, 0); setPixel(x + w + 2, 4); }
+    }
+
+    function renderMonBattle(nowMs, a) {
+      const t = nowMs - a.start;
+      const me = MON.form, en = a.enemy;
+      const mw = monSize(me).w, ew = monSize(en).w;
+      // 入場：兩邊滑進來
+      const slide = Math.max(0, 1 - t / MON_BATTLE_INTRO);
+      const mx = Math.round(-mw * slide), ex = COLS - ew + Math.round(ew * slide);
+      // 已結算的回合 -> 血量
+      const turnIdx = Math.floor((t - MON_BATTLE_INTRO) / MON_TURN_MS);
+      let php = 3, ehp = 3;
+      for (let i = 0; i < Math.min(turnIdx, a.turns.length); i++) if (a.turns[i].hit) { if (a.turns[i].me) ehp--; else php--; }
+      const endT = MON_BATTLE_INTRO + a.turns.length * MON_TURN_MS;
+      if (t >= endT + 600) {
+        // 結果畫面
+        drawTextCentered(a.win ? 'WIN!' : 'LOSE', 2);
+        if (a.win && Math.floor(nowMs / 150) % 2) { setPixel(5, 2); setPixel(36, 2); setPixel(4, 6); setPixel(37, 6); }
+        return;
+      }
+      let mdy = 0, edy = 0, mBlink = false, eBlink = false;
+      if (t >= MON_BATTLE_INTRO && turnIdx < a.turns.length) {
+        const tt = (t - MON_BATTLE_INTRO) % MON_TURN_MS;
+        const turn = a.turns[turnIdx];
+        const fromX = turn.me ? mx + mw : ex - 2;
+        const toX = turn.me ? ex : mx + mw - 2;
+        const travel = 450;
+        if (tt < travel) {
+          const bx = Math.round(fromX + (toX - fromX) * tt / travel);
+          setPixel(bx, 4); setPixel(bx + 1, 4); setPixel(bx, 5); setPixel(bx + 1, 5);
+          if (a.shot !== turnIdx) { a.shot = turnIdx; playTone(turn.me ? 900 : 700, 30); }
+        } else if (turn.hit) {
+          if (turn.me) eBlink = Math.floor(tt / 80) % 2 === 0; else mBlink = Math.floor(tt / 80) % 2 === 0;
+        } else {
+          // 閃避：往上跳，子彈穿過
+          if (turn.me) edy = -3; else mdy = -3;
+          const bx = Math.round(toX + (turn.me ? 1 : -1) * (tt - travel) / 12);
+          setPixel(bx, 4); setPixel(bx + 1, 4); setPixel(bx, 5); setPixel(bx + 1, 5);
+        }
+      }
+      if (t >= endT) { // 收尾：勝者跳、敗者閃
+        const hop = Math.floor((t - endT) / 120) % 2 ? -2 : 0;
+        if (a.win) { mdy = hop; eBlink = Math.floor(t / 100) % 2 === 0; } else { edy = hop; mBlink = Math.floor(t / 100) % 2 === 0; }
+      }
+      if (!mBlink) drawMonster(me, mx, Math.floor(nowMs / 300) % 2, { dy: mdy });
+      if (!eBlink) drawMonster(en, ex, Math.floor(nowMs / 300) % 2, { dy: edy });
+      // 中間上方血條 (避開兩側角色，完全體最寬 12 格 = x 0..11)：我方 x=13..20、對手 x=23..30，各 3 格 (每格 2x2、間隔 1)
+      // 扣血從中間往外扣；中央 x=21..22 留空當分隔
+      const hpCell = (x) => { setPixel(x, 0); setPixel(x + 1, 0); setPixel(x, 1); setPixel(x + 1, 1); };
+      for (let i = 0; i < 3; i++) {
+        if (i < php) hpCell(13 + i * 3);
+        if (i < ehp) hpCell(29 - i * 3);
+      }
+    }
+
+    // ---------------------------------------------------------------------
+    // 測試面板
+    // ---------------------------------------------------------------------
+    function monUpdateUI() {
+      const el = id => document.getElementById(id);
+      if (!el('monForm')) return;
+      const d = new Date(MON.clock);
+      const pad = n => String(n).padStart(2, '0');
+      const hearts = n => '♥'.repeat(n) + '♡'.repeat(4 - n);
+      el('monClock').textContent = `${pad(d.getHours())}:${pad(d.getMinutes())}　第 ${Math.floor(MON.ageMin / 1440) + 1} 天${monSleeping() ? '　😴 睡覺中' : ''}`;
+      const spName = MON.species >= 0 ? MON_SPECIES[MON.species].name + '・' : '';
+      el('monForm').textContent = `${spName}${MON_FORMS[MON.form].name}（${MON_STAGE_NAMES[monStage()]}）${MON.pendingForm ? ' → 即將變成 ' + MON_FORMS[MON.pendingForm].name : ''}`;
+      el('monStats').textContent = `飽食 ${hearts(MON.hunger)}　心情 ${hearts(MON.mood)}　力量 ${MON.power}`;
+      el('monCare').textContent = `便便 ${MON.poop}　${MON.sick ? '🤒 生病' : '健康'}　戰績 ${MON.wins} 勝 ${MON.losses} 敗`;
+      const nextMin = monStage() <= 3 ? MON_EVOLVE_AT[monStage()] : null;
+      el('monNext').textContent = nextMin ? `下次進化：${Math.max(0, Math.ceil((nextMin - MON.ageMin) / 60))} 小時後` : '已是完全體（最終型態）';
+      const dexList = DEX.map((m, i) => (i === monActive ? '▶' : '') + (m.species >= 0 ? MON_SPECIES[m.species].name : '蛋')).join('、');
+      el('monCount').textContent = `圖鑑 ${DEX.length}/${MON_DEX_MAX}：${dexList}${monCanNewEgg() ? '　🥚 可以養下一隻（到 K4 圖鑑頁）' : ''}　累計：訓練 ${MON.trains}、正餐 ${MON.meals}、零食 ${MON.snacks}`;
+    }
+    function monSetSpeed(v) {
+      monSpeed = v;
+      document.querySelectorAll('[data-monspeed]').forEach(b => b.classList.toggle('active', +b.dataset.monspeed === v));
+    }
+    function monDebug(cmd) {
+      if (cmd === 'hunger') MON.hunger = Math.max(0, MON.hunger - 1);
+      if (cmd === 'mood') MON.mood = Math.max(0, MON.mood - 1);
+      if (cmd === 'poop') monAddPoop();
+      if (cmd === 'sick') MON.sick = true;
+      if (cmd === 'power') MON.power = Math.min(99, MON.power + 5);
+      if (cmd === 'snack') monFeed(true);
+      if (cmd === 'battle') monStartBattle(Math.random() < 0.5 ? 'slime' : 'bat');
+      if (cmd === 'challenge' && monStage() >= 1) monView.challenge = { enemy: Math.random() < 0.5 ? 'slime' : 'bat', until: performance.now() + 20000 };
+      if (cmd === 'evolve') {
+        if (monStage() <= 3 && !MON.pendingForm) { MON.ageMin = Math.max(MON.ageMin, MON_EVOLVE_AT[monStage()] - 1); monSkipMinutes(1); }
+      }
+      if (cmd === 'reset') { DEX = [monNewEgg(MON.clock)]; monActive = 0; MON = DEX[0]; monResetView(); }   // 清空圖鑑，從第一顆蛋重新開始
+      if (cmd === 'fill') {   // 測試用：圖鑑直接加入一隻已長成完全體的新物種 (不切換)
+        if (DEX.length < MON_DEX_MAX) {
+          const m = monNewEgg(MON.clock); m.species = monPickSpecies(); m.form = monFormKey(m.species, 4); m.ageMin = MON_ULT_MIN + 1440 * Math.floor(Math.random() * 7);
+          m.power = Math.floor(Math.random() * 60); m.wins = Math.floor(Math.random() * 15); m.losses = Math.floor(Math.random() * 10);
+          DEX.splice(DEX.length - (monActive === DEX.length - 1 ? 1 : 0), 0, m);
+          monActive = DEX.indexOf(MON);
+        }
+      }
+      if (cmd === 'sound') { monSoundOn = !monSoundOn; document.getElementById('monSoundBtn').textContent = monSoundOn ? '🔔 呼叫音效：開' : '🔕 呼叫音效：關'; }
+      if (currentMode !== 'TAMA' && cmd !== 'sound') switchMode('TAMA');
+      monSave();
+      monUpdateUI();
+    }
+
+    /* =====================================================================
+     * 6. 13 大復古主題演出與鬧鐘反轉 (以真實毫秒計時，不受 60Hz/120Hz 螢幕刷新率影響)
+     * ===================================================================== */
+    let themeStartMs = 0;
+    let themeDismissStartMs = 0;
+    let pacmanVariant = 1; // 1: 左->右(無能量球), 2: 右->左(無能量球), 3: 左->右(含能量球), 4: 右->左(追擊模式)
+    let pacmanBoostScene4 = false; // 出現場景 3 後，下一輪場景 4 機率提高為 90%，顯示完畢後回復 40/40/10/10
+    let pacmanPassStartMs = 0;
+    let pokeForcedStyle = null; // 韌體匯出工具用：固定遇敵轉場
+    let pokeIntroStyle = 0; // 寶可夢隨機遇敵轉場動畫 (0: 雙向百葉窗, 1: 雷達扇形掃一圈, 2: 幾何方框漩渦填滿, 3: 棋盤格交錯填滿)
+    let lastPokeCycle = -1;
+
+    // 俄羅斯方塊 (橫向井道) 隨機混亂堆疊劇本：每輪重新生成，所有落點皆經真實碰撞模擬 (方塊從右往左滑，撞到障礙或左牆即停)
+    const DINO_LOOP_MS = 17280; // 60ms/步 × 48 步/仙人掌 × 6
+    let tetrisPlan = null;
+    let tetrisCycleStartMs = 0;
+    // 7 種 Tetromino 的所有旋轉形態，cells 為 [dc, dr] (dc: 往右欄位偏移, dr: 往下行偏移)
+    const TETRIS_SHAPES = [
+      [[0,0],[1,0],[2,0],[3,0]], [[0,0],[0,1],[0,2],[0,3]],                                   // I
+      [[0,0],[1,0],[0,1],[1,1]],                                                              // O
+      [[1,0],[0,1],[1,1],[2,1]], [[0,0],[1,0],[2,0],[1,1]], [[1,0],[0,1],[1,1],[1,2]], [[0,0],[0,1],[1,1],[0,2]], // T
+      [[1,0],[2,0],[0,1],[1,1]], [[0,0],[0,1],[1,1],[1,2]],                                   // S
+      [[0,0],[1,0],[1,1],[2,1]], [[1,0],[0,1],[1,1],[0,2]],                                   // Z
+      [[0,0],[0,1],[0,2],[1,2]], [[0,0],[1,0],[2,0],[0,1]], [[0,0],[1,0],[1,1],[1,2]], [[2,0],[0,1],[1,1],[2,1]], // L
+      [[1,0],[1,1],[0,2],[1,2]], [[0,0],[0,1],[1,1],[2,1]], [[0,0],[1,0],[0,1],[0,2]], [[0,0],[1,0],[2,0],[2,1]]  // J
+    ];
+
+    function buildTetrisPlan(rand) {
+      // grid[col][row]：col 0..19 (每格 2px，x = 2 + col*2)，row 0..3 (每格 2px，y = 1 + row*2)
+      const grid = Array.from({ length: 20 }, () => [false, false, false, false]);
+      for (let c = 0; c <= 3; c++) for (let r = 1; r <= 3; r++) grid[c][r] = true; // 前 4 排底座 (row=0 留黃金缺口)
+      for (let r = 0; r <= 3; r++) grid[4][r] = true;                              // 手殘轉直的 I 長條堵住洞口
+
+      const pieces = [];
+      let t = 3100;
+      let topOut = false;
+      for (let n = 0; n < 18 && !topOut; n++) {
+        const stepMs = Math.max(22, 46 - n * 2); // 越堆越慌，飛行速度越來越快
+        let chosen = null;
+        for (let attempt = 0; attempt < 40 && !chosen; attempt++) {
+          const cells = TETRIS_SHAPES[Math.floor(rand() * TETRIS_SHAPES.length)];
+          const h = Math.max(...cells.map(([, dr]) => dr)) + 1;
+          const rowOff = Math.floor(rand() * (5 - h));
+          const fits = (p) => cells.every(([dc, dr]) => {
+            const c = p + dc;
+            if (c < 0) return false;      // 撞左牆
+            if (c > 19) return true;      // 尚在畫面右側外
+            return !grid[c][rowOff + dr]; // 撞到已堆疊方塊
+          });
+          let p = 20;
+          while (fits(p - 1)) p--;
+          const minDc = Math.min(...cells.map(([dc]) => dc));
+          if (p + minDc > 19) continue;   // 完全擠不進畫面，換一顆
+          chosen = { cells, rowOff, p, stepMs };
+        }
+        if (!chosen) break;               // 盤面已無任何空間
+        const maxDc = Math.max(...chosen.cells.map(([dc]) => dc));
+        if (chosen.p + maxDc > 19) topOut = true; // 半截卡在右牆外 = 爆倉 Top-Out
+        chosen.start = t;
+        chosen.land = t + (20 - chosen.p) * stepMs;
+        for (const [dc, dr] of chosen.cells) {
+          const c = chosen.p + dc;
+          if (c <= 19) grid[c][chosen.rowOff + dr] = true;
+        }
+        pieces.push(chosen);
+        t = chosen.land + 110;
+      }
+
+      const settle = t;
+      const blinkStart = settle + 1000;     // 塞爆後定格 1 秒
+      const sinkStart = blinkStart + 400;   // 閃爍 2 下警報
+      const goStart = sinkStart + 1000;     // 盤面 (含邊框) 掉光後再留約 4 格空白
+      const total = goStart + 2900 + 600;   // GAME OVER 2.9 秒 + 黑屏 0.6 秒
+      return { pieces, settle, blinkStart, sinkStart, goStart, total };
+    }
+
+    // 以固定種子預先生成 6 組「必定爆倉」的堆疊劇本 (每次開啟都相同 = 寫死劇本)
+    const TETRIS_PLANS = (() => {
+      const plans = [];
+      for (let s = 1; plans.length < 6 && s < 500; s++) {
+        let seed = s * 7919;
+        const rand = () => ((seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648);
+        const p = buildTetrisPlan(rand);
+        const last = p.pieces[p.pieces.length - 1];
+        if (last && last.p + Math.max(...last.cells.map(([dc]) => dc)) > 19) plans.push(p); // 只收「爆倉 Top-Out」結局
+      }
+      return plans;
+    })();
+    let tetrisPlanIdx = 0, tetrisForcedPlan = null;
+
+    const PACMAN_VARIANT_NAMES = {
+      1: '場景 1：預設左→右（無能量球）',
+      2: '場景 2：右→左（無能量球）',
+      3: '場景 3：左→右（含能量球，下輪追擊率 90%！）',
+      4: '場景 4：右→左追擊模式（小精靈反追三隻受驚幽靈）'
+    };
+
+    // 依機率抽取小精靈子場景 (常態 40%, 40%, 10%, 10%；若剛出現場景 3 則場景 4 提升為 90%)
+    function rollPacmanVariant() {
+      const r = Math.random();
+      let picked = 1;
+      if (pacmanBoostScene4) {
+        // 場景 3 後觸發：場景 4 機率 90% (其餘 10% 依比例分配為 4%, 4%, 2%)
+        if (r < 0.04) picked = 1;
+        else if (r < 0.08) picked = 2;
+        else if (r < 0.10) picked = 3;
+        else picked = 4;
+      } else {
+        // 常態機率：40%, 40%, 10%, 10%
+        if (r < 0.40) picked = 1;
+        else if (r < 0.80) picked = 2;
+        else if (r < 0.90) picked = 3;
+        else picked = 4;
+      }
+      // 若本次為場景 3，下一輪提高場景 4 機率至 90%；否則顯示完畢後回復原機率
+      pacmanBoostScene4 = (picked === 3);
+      return picked;
+    }
+
+    function updatePacmanVariantButtons(activeVar) {
+      const probs = pacmanBoostScene4 ? ['4%', '4%', '2%', '🔥90%'] : ['40%', '40%', '10%', '10%'];
+      const labels = [
+        `場景 1：左→右 無能量球 (${probs[0]})`,
+        `場景 2：右→左 無能量球 (${probs[1]})`,
+        `場景 3：左→右 含能量球 (${probs[2]})`,
+        `場景 4：右→左 追擊模式 (${probs[3]})`
+      ];
+      for (let i = 1; i <= 4; i++) {
+        const btn = document.getElementById('btnPacScene' + i);
+        if (btn) {
+          btn.textContent = labels[i - 1];
+          btn.classList.toggle('active', activeVar === i);
+        }
+      }
+    }
+
+    function playPacmanVariant(v) {
+      playTheme('pacman', v);
+    }
+
+    function playTheme(themeName, forcedPacVariant = null) {
+      initAudio();
+      currentMode = 'ALARM';
+      activeAlarmTheme = themeName;
+      alarmDismissed = false;
+      themeStartMs = performance.now();
+      themeDismissStartMs = 0;
+      pacmanPassStartMs = themeStartMs;
+      tetrisPlan = null; // 俄羅斯方塊每次觸發後第一幀挑選劇本
+      document.getElementById('indAL1').classList.add('active');
+
+      // 播放對應主題的經典 8-bit 前奏
+      if (themeName === 'pacman') {
+        if (forcedPacVariant !== null) {
+          pacmanVariant = forcedPacVariant;
+          pacmanBoostScene4 = (forcedPacVariant === 3);
+        } else {
+          pacmanVariant = rollPacmanVariant();
+        }
+        updatePacmanVariantButtons(pacmanVariant);
+        document.getElementById('modeDesc').textContent = `🟡 小精靈鬧鐘 — 本次顯示【${PACMAN_VARIANT_NAMES[pacmanVariant]}】`;
+        playMelody([
+          [494, 120, 20], [988, 120, 20], [740, 120, 20], [622, 120, 20],
+          [988, 80, 20],  [740, 140, 20], [622, 160, 0]
+        ]);
+      } else {
+        updatePacmanVariantButtons(0);
+      }
+
+      if (themeName === 'snake') {
+        snakeCycleStartMs = 0; // 觸發後第一幀立即挑選劇本
+      } else {
+        snakeForcedPlan = null;
+      }
+      if (themeName === 'racer') {
+        racerCycleStartMs = 0;
+      } else {
+        racerForcedPlan = null;
+      }
+      if (themeName === 'pong') {
+        pongCycleStartMs = 0;
+      } else {
+        pongForcedPlan = null;
+      }
+
+      if (themeName === 'mario') {
+        playMelody([
+          [660, 90, 40], [660, 90, 80], [660, 90, 80],
+          [510, 90, 40], [660, 90, 80], [770, 100, 120], [380, 120, 0]
+        ]);
+      } else if (themeName === 'tetris') {
+        playMelody([
+          [659, 160, 20], [494, 80, 20], [523, 80, 20], [587, 160, 20],
+          [523, 80, 20],  [494, 80, 20], [440, 160, 20], [440, 80, 20],
+          [523, 80, 20],  [659, 160, 20]
+        ]);
+      } else if (themeName === 'snake') {
+        // Nokia 貪食蛇開場音
+        playMelody([[659, 80, 20], [659, 80, 20], [659, 80, 20], [880, 140, 0]]);
+      } else if (themeName === 'pokemon') {
+        pokeIntroStyle = pokeForcedStyle !== null ? pokeForcedStyle : Math.floor(Math.random() * 4);
+        lastPokeCycle = 0;
+        playMelody([
+          [880, 70, 20], [784, 70, 20], [698, 70, 20], [659, 70, 20],
+          [587, 70, 20], [523, 70, 20], [494, 70, 20], [440, 140, 0]
+        ]);
+      } else if (themeName === 'dino') {
+        playMelody([[1500, 50, 30], [2000, 60, 0]]);
+      } else if (themeName === 'continue') {
+        playMelody([[880, 80, 100], [880, 80, 100], [880, 80, 0]]);
+      } else if (themeName === 'bsod') {
+        // Windows 當機連續彈窗低沉警告音 (咚！咚！咚！)
+        playMelody([[220, 120, 50], [220, 120, 50], [165, 260, 0]]);
+      } else if (themeName === 'invaders') {
+        playPortamento(1800, 400, 120);
+      }
+    }
+
+    function dismissAlarm() {
+      alarmDismissed = true;
+      themeDismissStartMs = performance.now(); // 停留 2.5 秒反轉畫面
+      document.getElementById('indAL1').classList.remove('active');
+
+      // 反轉彩蛋音效
+      if (activeAlarmTheme === 'mario') {
+        // 吃金幣叮！
+        playTone(988, 80);
+        setTimeout(() => playTone(1319, 300), 80);
+      } else if (activeAlarmTheme === 'pacman') {
+        // 幽靈被吃掉下沉音
+        playPortamento(800, 150, 300);
+      } else if (activeAlarmTheme === 'continue') {
+        // 投幣音
+        playTone(1500, 60);
+        setTimeout(() => playTone(2200, 250), 70);
+      } else if (activeAlarmTheme === 'pokemon') {
+        // 捕捉成功清脆音
+        playMelody([[1047, 80, 30], [1319, 80, 30], [1568, 80, 30], [2093, 200, 0]]);
+      } else if (activeAlarmTheme === 'dino') {
+        // 破百過關音
+        playMelody([[1300, 60, 20], [1800, 150, 0]]);
+      } else if (activeAlarmTheme === 'bsod') {
+        // Windows 經典開機合弦上升音 (Reboot OK!)
+        playMelody([[523, 90, 20], [659, 90, 20], [784, 90, 20], [1047, 240, 0]]);
+      } else if (activeAlarmTheme === 'tetris') {
+        // 俄羅斯方塊 4 行全消 (TETRIS Line Clear!) 經典八度上升音效
+        playMelody([[523, 70, 20], [659, 70, 20], [784, 70, 20], [1047, 90, 30], [1319, 220, 0]]);
+      } else if (['snake', 'flappy', 'rhythm', 'racer', 'pong'].includes(activeAlarmTheme)) {
+        stopMelody(); // 反轉音效由場景內時間軸觸發
+      } else {
+        playTone(1800, 120);
+      }
+    }
+
+    function triggerRandomAlarm() {
+      const themes = ['pacman', 'dino', 'mario', 'invaders', 'pokemon', 'continue', 'bsod', 'tetris', 'snake', 'flappy', 'rhythm', 'racer', 'pong'];
+      const pick = themes[Math.floor(Math.random() * themes.length)];
+      snakeForcedPlan = null;
+      racerForcedPlan = null;
+      pongForcedPlan = null;
+      playTheme(pick);
+    }
+
+    /* =====================================================================
+     * 6b. 共用工具：3x5 文字字型 + 循環事件音效排程
+     * ===================================================================== */
+    const TEXT_FONT_3x5 = {
+      A: { w: 3, r: [2, 5, 7, 5, 5] }, B: { w: 3, r: [6, 5, 6, 5, 6] }, C: { w: 3, r: [7, 4, 4, 4, 7] },
+      D: { w: 3, r: [6, 5, 5, 5, 6] }, E: { w: 3, r: [7, 4, 7, 4, 7] }, F: { w: 3, r: [7, 4, 7, 4, 4] },
+      G: { w: 3, r: [7, 4, 5, 5, 7] }, H: { w: 3, r: [5, 5, 7, 5, 5] }, I: { w: 3, r: [7, 2, 2, 2, 7] },
+      K: { w: 3, r: [5, 5, 6, 5, 5] }, L: { w: 3, r: [4, 4, 4, 4, 7] }, M: { w: 5, r: [0x11, 0x1B, 0x15, 0x11, 0x11] },
+      N: { w: 4, r: [0x9, 0xD, 0xB, 0x9, 0x9] }, O: { w: 3, r: [7, 5, 5, 5, 7] }, P: { w: 3, r: [7, 5, 7, 4, 4] },
+      R: { w: 3, r: [6, 5, 6, 5, 5] }, S: { w: 3, r: [7, 4, 7, 1, 7] }, T: { w: 3, r: [7, 2, 2, 2, 2] },
+      U: { w: 3, r: [5, 5, 5, 5, 7] }, W: { w: 5, r: [0x11, 0x11, 0x15, 0x1B, 0x11] }, X: { w: 3, r: [5, 5, 2, 5, 5] },
+      V: { w: 3, r: [5, 5, 5, 5, 2] }, Y: { w: 3, r: [5, 5, 2, 2, 2] }, '!': { w: 1, r: [1, 1, 1, 0, 1] }, ' ': { w: 1, r: [0, 0, 0, 0, 0] }
+    };
+
+    function textGlyph(ch) {
+      if (ch >= '0' && ch <= '9') return { w: 3, r: NUM_FONT_3x5[+ch] };
+      return TEXT_FONT_3x5[ch] || TEXT_FONT_3x5[' '];
+    }
+
+    function textWidth(str) {
+      let w = 0;
+      for (const ch of str) w += textGlyph(ch).w;
+      return w + Math.max(0, str.length - 1);
+    }
+
+    function drawText(str, x, y) {
+      for (const ch of str) {
+        const g = textGlyph(ch);
+        drawSprite(g.r, g.w, 5, x, y);
+        x += g.w + 1;
+      }
+    }
+
+    function drawTextCentered(str, y) {
+      drawText(str, Math.floor((COLS - textWidth(str)) / 2), y);
+    }
+
+    // 依「循環內時間點」觸發音效：每個時間點每輪只觸發一次，落後超過 250ms (如分頁切走) 則略過不補播
+    const cycleSfxState = {};
+    function fireCycleEvents(key, startRef, cycleLen, elapsedMs, events) {
+      const cycleIdx = Math.floor(elapsedMs / cycleLen);
+      const cycleMs = elapsedMs % cycleLen;
+      let st = cycleSfxState[key];
+      if (!st || st.cycle !== cycleIdx || st.start !== startRef) {
+        st = cycleSfxState[key] = { cycle: cycleIdx, start: startRef, done: new Set() };
+      }
+      events.forEach((ev, i) => {
+        if (cycleMs >= ev[0] && !st.done.has(i)) {
+          st.done.add(i);
+          if (cycleMs - ev[0] <= 250) ev[1]();
+        }
+      });
+    }
+
+    /* =====================================================================
+     * 9. 貪食蛇 (Snake Nostalgia)
+     * 1px 邊框 (x=0,41 / y=0,8) 內的格點移動 (只走上下左右，與邊框保留 1 格空隙)，初始長 6 格，
+     * 每吃 1 顆果實逐步增長 3 格 (共 4 顆 -> 18 格)；吃完第 4 顆後 U 字迴轉，蛇頭 T 字撞上自己身體
+     * ===================================================================== */
+    const SNAKE_STEP_MS = 110;
+    const SNAKE_START_LEN = 6;
+    const SNAKE_GROW = 3;
+    const SNAKE_DEATH_MS = 1200 + 18 * 60 + 600; // 閃爍 1.2s + 逐節消失 + 黑屏留白 0.6s
+    // 隨機生成後固定儲存的 6 組劇本 (由 tools/gen_snake_plans.js 產生並驗證)：
+    // way = 路徑轉折點 (相鄰兩點必為水平或垂直線段，起點 6 格為初始蛇身)，fruits = 依序出現的 4 顆果實
+    const SNAKE_PLANS = [
+      { way: [[2, 5], [12, 5], [12, 6], [21, 6], [21, 4], [11, 4], [11, 2], [5, 2], [5, 5], [14, 5], [14, 3], [10, 3], [10, 5]],
+        fruits: [[21, 6], [15, 4], [5, 2], [14, 5]] },
+      { way: [[2, 4], [7, 4], [7, 6], [18, 6], [18, 2], [6, 2], [6, 4], [16, 4], [16, 6], [22, 6], [22, 4], [18, 4], [18, 6]],
+        fruits: [[18, 5], [6, 2], [16, 4], [22, 6]] },
+      { way: [[2, 4], [18, 4], [18, 5], [24, 5], [24, 3], [30, 3], [30, 5], [19, 5], [19, 3], [23, 3], [23, 5]],
+        fruits: [[18, 5], [24, 4], [30, 3], [19, 5]] },
+      { way: [[2, 5], [9, 5], [9, 2], [24, 2], [24, 5], [34, 5], [34, 2], [20, 2], [20, 4], [26, 4], [26, 2]],
+        fruits: [[13, 2], [24, 5], [34, 4], [20, 2]] },
+      { way: [[2, 3], [7, 3], [7, 2], [11, 2], [11, 6], [36, 6], [36, 3], [29, 3], [29, 6], [33, 6], [33, 3]],
+        fruits: [[11, 6], [26, 6], [36, 6], [29, 3]] },
+      { way: [[2, 4], [7, 4], [7, 6], [18, 6], [18, 2], [32, 2], [32, 6], [16, 6], [16, 4], [22, 4], [22, 6]],
+        fruits: [[18, 5], [32, 2], [25, 6], [16, 6]] },
+    ];
+
+    // 將劇本展開成逐格路徑，推算吃果實步數、各步蛇身與撞擊步數
+    function buildSnakeSim(plan) {
+      const path = [plan.way[0]];
+      for (let i = 1; i < plan.way.length; i++) {
+        const [x0, y0] = plan.way[i - 1], [x1, y1] = plan.way[i];
+        const dx = Math.sign(x1 - x0), dy = Math.sign(y1 - y0);
+        for (let x = x0 + dx, y = y0 + dy; ; x += dx, y += dy) {
+          path.push([x, y]);
+          if (x === x1 && y === y1) break;
+        }
+      }
+      const headStart = SNAKE_START_LEN - 1; // path[0..5] 為初始蛇身
+      // 果實依序出現：每顆從上一顆被吃掉之後才開始找 (路徑可能更早經過同一格)
+      const eatSteps = [];
+      let from = headStart;
+      for (const [fx, fy] of plan.fruits) {
+        from = path.findIndex((p, i) => i > from && p[0] === fx && p[1] === fy);
+        eatSteps.push(from - headStart);
+      }
+      const lenAt = step => SNAKE_START_LEN + eatSteps.reduce((sum, e) => sum + Math.max(0, Math.min(SNAKE_GROW, step - e)), 0);
+      const bodyAt = step => {
+        const head = headStart + step, len = lenAt(step), body = [];
+        for (let i = 0; i < len && head - i >= 0; i++) body.push(path[head - i]);
+        return body;
+      };
+      // 蛇頭第一次與自己身體重疊的步數 (含增長中尾巴不動的情況)
+      let crashStep = -1;
+      for (let s = 1; headStart + s < path.length; s++) {
+        const body = bodyAt(s);
+        if (body.slice(1).some(([bx, by]) => bx === body[0][0] && by === body[0][1])) { crashStep = s; break; }
+      }
+      const crashMs = crashStep * SNAKE_STEP_MS;
+      const events = eatSteps.map(st => [st * SNAKE_STEP_MS, () => { playTone(1320, 40); setTimeout(() => playTone(1760, 50), 45); }])
+        .concat([
+          [crashMs, () => { playTone(110, 300); playPortamento(500, 80, 400); }],
+          [crashMs + 1200, () => playPortamento(900, 90, 1080)] // 從尾到頭逐節消失的下沉音
+        ]);
+      return { fruits: plan.fruits, path, eatSteps, bodyAt, crashStep, crashMs, cycle: crashMs + SNAKE_DEATH_MS, events };
+    }
+    const SNAKE_SIMS = SNAKE_PLANS.map(buildSnakeSim);
+
+    // 每輪結束後隨機換一組劇本 (不與上一輪重複)；指定預覽時固定播放該組
+    let snakePlanIdx = 0;
+    let snakeForcedPlan = null;
+    let snakeCycleStartMs = 0;
+    function pickSnakePlan(nowMs) {
+      if (snakeForcedPlan !== null) {
+        snakePlanIdx = snakeForcedPlan;
+      } else {
+        let next;
+        do { next = Math.floor(Math.random() * SNAKE_SIMS.length); } while (SNAKE_SIMS.length > 1 && next === snakePlanIdx);
+        snakePlanIdx = next;
+      }
+      snakeCycleStartMs = nowMs;
+      updateSnakePlanButtons();
+    }
+    function updateSnakePlanButtons() {
+      SNAKE_SIMS.forEach((_, i) => {
+        const btn = document.getElementById('btnSnakePlan' + (i + 1));
+        if (btn) btn.classList.toggle('active', currentMode === 'ALARM' && activeAlarmTheme === 'snake' && i === snakePlanIdx);
+      });
+    }
+    function playSnakePlan(i) {
+      snakeForcedPlan = i;
+      playTheme('snake');
+    }
+
+    const SNAKE_DISMISS_EVENTS = [
+      [880, () => playMelody([[880, 70, 20], [1175, 70, 20], [1480, 70, 20], [1760, 220, 0]])]
+    ];
+
+    function drawSnakeBorder() {
+      drawLine(0, 0, 41, 0); drawLine(0, 8, 41, 8);
+      drawLine(0, 0, 0, 8); drawLine(41, 0, 41, 8);
+    }
+
+    function renderSnake(elapsedMs, nowMs) {
+      if (!alarmDismissed) {
+        if (snakeCycleStartMs < themeStartMs || nowMs - snakeCycleStartMs >= SNAKE_SIMS[snakePlanIdx].cycle) {
+          pickSnakePlan(nowMs);
+        }
+        const SNAKE_SIM = SNAKE_SIMS[snakePlanIdx];
+        const cycleMs = nowMs - snakeCycleStartMs;
+        fireCycleEvents('snake', snakeCycleStartMs, 1e9, cycleMs, SNAKE_SIM.events);
+        drawSnakeBorder();
+
+        if (cycleMs < SNAKE_SIM.crashMs) {
+          const step = Math.floor(cycleMs / SNAKE_STEP_MS);
+          // 目前目標果實 (被吃掉那一步才消失)，每 600ms 短暫熄滅 150ms 閃爍
+          const nextFruit = SNAKE_SIM.eatSteps.findIndex(e => step < e);
+          if (nextFruit >= 0 && Math.floor(nowMs / 150) % 4 !== 0) {
+            setPixel(SNAKE_SIM.fruits[nextFruit][0], SNAKE_SIM.fruits[nextFruit][1]);
+          }
+          for (const [x, y] of SNAKE_SIM.bodyAt(step)) setPixel(x, y);
+        } else {
+          // 撞到自己：定格在撞擊前一刻 -> 全身閃爍 3 次 -> 從尾巴往蛇頭每 60ms 消失 1 節 -> 只留邊框
+          const dead = cycleMs - SNAKE_SIM.crashMs;
+          const body = SNAKE_SIM.bodyAt(SNAKE_SIM.crashStep - 1);
+          if (dead < 1200) {
+            if (Math.floor(dead / 200) % 2 === 0) for (const [x, y] of body) setPixel(x, y);
+          } else {
+            const remain = body.length - Math.floor((dead - 1200) / 60);
+            for (let i = 0; i < remain; i++) setPixel(body[i][0], body[i][1]);
+          }
+        }
+      } else {
+        fireCycleEvents('snakeD', themeDismissStartMs, 100000, elapsedMs, SNAKE_DISMISS_EVENTS);
+
+        if (elapsedMs < 1200) {
+          drawSnakeBorder();
+          // 3x3 大金豆 (菱形) 出現在前方，蛇沿 y=4 直衝吃下
+          const headX = Math.min(28, 6 + Math.floor(elapsedMs / 40));
+          const ate = elapsedMs >= 880;
+          if (!ate) {
+            setPixel(30, 3); setPixel(29, 4); setPixel(30, 4); setPixel(31, 4); setPixel(30, 5);
+          }
+          // 吃下後全身發光閃爍並長出 3 格
+          const len = ate ? 15 : 12;
+          if (!ate || Math.floor(elapsedMs / 80) % 2 === 0) {
+            for (let i = 0; i < len; i++) setPixel(headX - i, 4);
+          }
+        } else {
+          // 左側愛心 + 右側 WIN! (整組置中)
+          drawSprite(SPRITES.heart, 5, 4, 8, 3);
+          drawText('WIN!', 17, 2);
+          if (Math.floor(elapsedMs / 150) % 2 === 0) {
+            setPixel(36, 1); setPixel(35, 2); setPixel(37, 2); setPixel(36, 3);
+            setPixel(5, 6); setPixel(4, 7); setPixel(6, 7); setPixel(5, 5);
+          }
+        }
+      }
+    }
+
+    /* =====================================================================
+     * 11. 節奏音軌 (Rhythm Lanes)
+     * 3 條 2px 高音軌 (y=0..1 / 3..4 / 6..7)，音符由右往左捲到判定線 (x=5)，
+     * 蜂鳴器同步彈出旋律；前 10 拍完美命中、後 5 拍依序 晚按 / 早按 / 按錯軌 / 晚按 / 慌亂連打 -> MISS! -> COMBO 0
+     * ===================================================================== */
+    const RHYTHM_CYCLE = 9000;
+    const RHYTHM_JUDGE_X = 5;
+    const RHYTHM_PX_MS = 28;              // 音符每 28ms 左移 1px
+    const RHYTHM_LANE_Y = [0, 3, 6];      // 上 / 中 / 下 3 條音軌，y=8 為連擊能量條
+    // 歡樂頌 (公有領域旋律)：G 上軌、E/F 中軌、C/D 下軌
+    const RHYTHM_LANE_F = [392, 330, 262];  // 各音軌代表音 (按錯軌時發出的錯音)
+    // 後 5 拍的失誤方式：late = 音符已過判定線才按、early = 音符還沒到就按、wrong = 準時但按到別條軌、mash = 慌亂三軌連打
+    const RHYTHM_MISS_KINDS = ['late', 'early', 'wrong', 'late', 'mash'];
+    const RHYTHM_CHART = [330, 330, 349, 392, 392, 349, 330, 294, 262, 262, 294, 330, 330, 294, 294]
+      .map((f, i) => ({ t: 1300 + i * 300, f, lane: f >= 392 ? 0 : (f >= 330 ? 1 : 2), hit: i < 10, kind: i < 10 ? 'hit' : RHYTHM_MISS_KINDS[i - 10] }));
+    // 按鍵紀錄：ok = 命中 (打擊墊實心亮)，否則為失誤按鍵 (打擊墊棋盤格亮)；f = 按下當下發出的音
+    const RHYTHM_PRESSES = [];
+    RHYTHM_CHART.forEach((n, i) => {
+      const other = (n.lane + 1 + (i % 2)) % 3;
+      if (n.kind === 'hit') RHYTHM_PRESSES.push({ t: n.t, lane: n.lane, ok: true, f: n.f });
+      else if (n.kind === 'late') RHYTHM_PRESSES.push({ t: n.t + 110, lane: n.lane, f: n.f * 0.94 });   // 音符已滑進打擊墊才按
+      else if (n.kind === 'early') RHYTHM_PRESSES.push({ t: n.t - 150, lane: n.lane, f: n.f * 1.06 });  // 音符還在 5px 外就按
+      else if (n.kind === 'wrong') RHYTHM_PRESSES.push({ t: n.t, lane: other, f: RHYTHM_LANE_F[other] * 0.94 });
+      else if (n.kind === 'mash') {
+        [[-200, 0], [-130, 2], [-60, 1], [10, 0], [80, 2], [150, n.lane]].forEach(([dt, l]) =>
+          RHYTHM_PRESSES.push({ t: n.t + dt, lane: l, f: RHYTHM_LANE_F[l] * 0.94, short: true }));
+      }
+    });
+    const RHYTHM_FIRST_MISS_T = Math.min(...RHYTHM_CHART.filter(n => !n.hit).map(n => n.t),
+      ...RHYTHM_PRESSES.filter(p => !p.ok).map(p => p.t));
+    const RHYTHM_EVENTS = RHYTHM_PRESSES.map(p => [p.t, () => {
+      if (p.ok) playTone(p.f, 220);
+      else playTone(p.f, p.short ? 60 : 140, 0.8);                 // 走音 / 錯音
+    }]).concat(RHYTHM_CHART.filter(n => !n.hit).map(n => [n.t, () => playTone(98, 160, 0.6)])) // 音符沒被接到：低沉悶響
+      .concat([
+        [5900, () => playPortamento(400, 90, 600)],                                   // 音樂洩氣
+        [7300, () => playMelody([[262, 140, 40], [247, 140, 40], [233, 360, 0]])]      // COMBO 0 嘆息
+      ]);
+    // 解除彩蛋：判定光束由左掃到右，沿途音符逐一炸開
+    const RHYTHM_SWEEP_NOTES = [
+      { x: 11, lane: 0 }, { x: 16, lane: 2 }, { x: 21, lane: 1 }, { x: 26, lane: 0 },
+      { x: 31, lane: 2 }, { x: 36, lane: 1 }, { x: 40, lane: 0 }
+    ];
+    const RHYTHM_SWEEP_MS_PX = 16;
+    const RHYTHM_DISMISS_EVENTS = RHYTHM_SWEEP_NOTES.map((n, i) => [
+      (n.x - RHYTHM_JUDGE_X) * RHYTHM_SWEEP_MS_PX,
+      () => playTone([523, 587, 659, 784, 880, 1047, 1319][i], 90)
+    ]).concat([[700, () => playMelody([[1047, 90, 20], [1319, 90, 20], [1568, 90, 20], [2093, 300, 0]])]]);
+
+    function drawRhythmNote(x, lane) {
+      const y = RHYTHM_LANE_Y[lane];
+      setPixel(x, y); setPixel(x + 1, y); setPixel(x, y + 1); setPixel(x + 1, y + 1);
+    }
+
+    function renderRhythm(elapsedMs, nowMs) {
+      if (!alarmDismissed) {
+        fireCycleEvents('rhythm', themeStartMs, RHYTHM_CYCLE, elapsedMs, RHYTHM_EVENTS);
+        const cycleMs = elapsedMs % RHYTHM_CYCLE;
+
+        if (cycleMs < 6000) {
+          // 最近 160ms 內是否有漏接 (判定線抖動)
+          const recentMiss = RHYTHM_CHART.some(n => !n.hit && cycleMs >= n.t && cycleMs - n.t < 160) ||
+            RHYTHM_PRESSES.some(p => !p.ok && cycleMs >= p.t && cycleMs - p.t < 120);
+          if (!recentMiss || Math.floor(nowMs / 50) % 2 === 0) {
+            drawLine(RHYTHM_JUDGE_X, 0, RHYTHM_JUDGE_X, 7);
+          }
+
+          // 左側打擊墊：平時為暗點；命中 150ms 內亮起實心 4x2 光塊，失誤按鍵 120ms 內亮起棋盤格 (空按)
+          for (let lane = 0; lane < 3; lane++) {
+            const y = RHYTHM_LANE_Y[lane];
+            const p = RHYTHM_PRESSES.find(p => p.lane === lane && cycleMs >= p.t && cycleMs - p.t < (p.ok ? 150 : 120));
+            if (p && p.ok) {
+              drawLine(0, y, 3, y); drawLine(0, y + 1, 3, y + 1);
+            } else if (p) {
+              setPixel(0, y); setPixel(2, y); setPixel(1, y + 1); setPixel(3, y + 1);
+            } else {
+              setPixel(2, y); setPixel(2, y + 1);
+            }
+          }
+
+          // 音符：命中者抵達判定線即消失；漏接者穿過判定線繼續往左滑出
+          for (const n of RHYTHM_CHART) {
+            const x = RHYTHM_JUDGE_X + Math.round((n.t - cycleMs) / RHYTHM_PX_MS);
+            if (x > COLS - 1) continue;
+            if (n.hit && cycleMs >= n.t) continue;
+            if (x < -2) continue;
+            if (!n.hit && x <= RHYTHM_JUDGE_X) {
+              // 漏接音符變成空心殘影往左掉出
+              if (Math.floor(nowMs / 80) % 2 === 0) drawRhythmNote(x, n.lane);
+            } else {
+              drawRhythmNote(x, n.lane);
+            }
+          }
+
+          // y=8 連擊能量條：每次命中 +4px，第一次漏接即歸零
+          const combo = cycleMs >= RHYTHM_FIRST_MISS_T ? 0 : RHYTHM_CHART.filter(n => n.hit && cycleMs >= n.t).length;
+          if (combo > 0) drawLine(0, 8, Math.min(COLS - 1, combo * 4 - 1), 8);
+        } else if (cycleMs < 7200) {
+          if (Math.floor(nowMs / 150) % 2 === 0) drawTextCentered('MISS!', 2);
+        } else if (cycleMs < 8400) {
+          drawTextCentered('COMBO 0', 2);
+        }
+        // 8400 ~ 9000ms：黑屏留白
+      } else {
+        fireCycleEvents('rhythmD', themeDismissStartMs, 100000, elapsedMs, RHYTHM_DISMISS_EVENTS);
+
+        if (elapsedMs < 650) {
+          // 金色判定光束由左往右橫掃，沿途音符炸裂成四向火花
+          const sweepX = Math.min(COLS - 1, RHYTHM_JUDGE_X + Math.floor(elapsedMs / RHYTHM_SWEEP_MS_PX));
+          drawLine(sweepX, 0, sweepX, 7);
+          for (const n of RHYTHM_SWEEP_NOTES) {
+            const y = RHYTHM_LANE_Y[n.lane];
+            if (n.x > sweepX) {
+              drawRhythmNote(n.x, n.lane);
+            } else if (sweepX - n.x < 6) {
+              const d = 1 + Math.floor((sweepX - n.x) / 2);
+              setPixel(n.x - d, y - d); setPixel(n.x + 1 + d, y - d);
+              setPixel(n.x - d, y + 1 + d); setPixel(n.x + 1 + d, y + 1 + d);
+            }
+          }
+          drawLine(0, 8, sweepX, 8); // 能量條跟著光束一起灌滿
+        } else {
+          drawTextCentered('PERFECT', 2);
+          drawLine(0, 8, COLS - 1, 8);
+          if (Math.floor(nowMs / 120) % 2 === 0) {
+            for (let x = 1; x < COLS; x += 6) setPixel(x, 0);
+          } else {
+            for (let x = 4; x < COLS; x += 6) setPixel(x, 0);
+          }
+        }
+      }
+    }
+
+    /* =====================================================================
+     * 12. 公路賽車 (Top-Down Racer)
+     * 上下護欄 (y=0, 8) + 中央虛線 (y=4) 分出 2 條 3px 高車道 (y=1..3 / 5..7)，
+     * 玩家車固定 x=3..8，連續 3~5 次換道閃避、一次比一次驚險，最後以 夾擊 / 換道太晚 / 慌張換道 其中一種死法撞車 -> CRASH!
+     * 6 組固定劇本每輪隨機輪替 (不連續重複)
+     * ===================================================================== */
+    const RACER_PLAYER_X = 3;
+    const RACER_ENEMY_PX_MS = 22;         // 對向來車每 22ms 逼近 1px
+    const RACER_ROAD_PX_MS = 40;          // 路面虛線每 40ms 捲動 1px
+    const RACER_LANE_Y = [1, 5];
+    const RACER_SWITCH_MS = 160;          // 換道過程 160ms (y 線性移動四捨五入)
+    const RACER_CAR_PLAYER = [0x32, 0x1F, 0x32]; // 6x3 車頭朝右 (後輪寬、前輪窄)
+    const RACER_CAR_ENEMY = [0x12, 0x3F, 0x12];  // 6x3 對向來車
+    // 隨機生成後固定儲存的 6 組劇本 (由 tools/gen_racer_plans.js 產生並驗證)：
+    // death = 死法 (pincer 夾擊 / late 換道太晚 / swerve 慌張換道撞上對向來車)，start = 起始車道 (0 上 / 1 下)
+    // enemies = [生成時間 ms, 車道]，switches = [開始換道時間 ms, 目標車道]
+    const RACER_PLANS = [
+      { death: 'pincer', start: 0,
+        enemies: [[312, 0], [1498, 1], [2524, 0], [3543, 1], [4598, 0], [4766, 1]],
+        switches: [[798, 1], [2023, 0], [3103, 1], [4156, 0], [5215, 1]] },
+      { death: 'late', start: 1,
+        enemies: [[235, 1], [541, 1], [1419, 0], [2543, 1], [3601, 0], [4764, 1]],
+        switches: [[730, 0], [1959, 1], [3111, 0], [4228, 1], [5484, 0]] },
+      { death: 'swerve', start: 0,
+        enemies: [[165, 0], [463, 0], [1139, 1], [1534, 1], [2089, 0], [2499, 0], [3145, 1], [3858, 1], [4207, 0]],
+        switches: [[654, 1], [1679, 0], [2674, 1], [3771, 0], [4261, 1]] },
+      { death: 'late', start: 1,
+        enemies: [[301, 1], [1457, 0], [1746, 0], [2475, 1], [2883, 1], [3657, 0], [4004, 0], [4613, 1]],
+        switches: [[786, 0], [1989, 1], [3045, 0], [4275, 1], [5333, 0]] },
+      { death: 'swerve', start: 1,
+        enemies: [[320, 1], [1366, 0], [2533, 1], [3570, 0], [4522, 1], [5305, 1], [5662, 0]],
+        switches: [[804, 0], [1898, 1], [3095, 0], [4168, 1], [5136, 0], [5733, 1]] },
+      { death: 'pincer', start: 0,
+        enemies: [[279, 0], [1383, 1], [1715, 1], [2397, 0], [3543, 1], [3699, 0]],
+        switches: [[773, 1], [1931, 0], [3022, 1], [4168, 0]] },
+    ];
+    const RACER_AFTER_CRASH_MS = 1600, RACER_TEXT_MS = 1400, RACER_BLANK_MS = 600;
+
+    function racerPlayerYFor(sim, t) {
+      let y = RACER_LANE_Y[sim.start];
+      for (const [st, lane] of sim.switches) {
+        if (t < st) break;
+        const from = y, to = RACER_LANE_Y[lane];
+        y = Math.round(from + (to - from) * Math.min(1, (t - st) / RACER_SWITCH_MS));
+      }
+      return y;
+    }
+    const racerEnemyX = (spawn, t) => COLS - Math.floor((t - spawn) / RACER_ENEMY_PX_MS);
+    function buildRacerSim(plan) {
+      const sim = { death: plan.death, start: plan.start, enemies: plan.enemies, switches: plan.switches };
+      // 逐毫秒找第一次碰撞 (與產生器相同規則)
+      for (let t = 0; t < 9000 && !sim.crashT; t++) {
+        const py = racerPlayerYFor(sim, t);
+        for (const [spawn, lane] of plan.enemies) {
+          if (t < spawn) continue;
+          const ex = racerEnemyX(spawn, t), ey = RACER_LANE_Y[lane];
+          if (ex <= RACER_PLAYER_X + 5 && ex + 5 >= RACER_PLAYER_X && ey <= py + 2 && ey + 2 >= py) {
+            sim.crashT = t; sim.crashY = py;
+            // 火花在接觸點：x = 敵車車頭 (夾在玩家車身範圍內)，y = 同車道取車身中線、換道中取兩車交界列
+            sim.sparkX = Math.min(RACER_PLAYER_X + 5, Math.max(RACER_PLAYER_X, ex));
+            sim.sparkY = ey === py ? py + 1 : (ey > py ? ey : ey + 2);
+            break;
+          }
+        }
+      }
+      sim.textT = sim.crashT + RACER_AFTER_CRASH_MS;
+      sim.cycle = sim.textT + RACER_TEXT_MS + RACER_BLANK_MS;
+      sim.events = [[0, () => playPortamento(180, 520, 450)]]
+        .concat(plan.switches.map(([st]) => [st, () => playTone(900, 30, 0.6)]))
+        .concat(plan.enemies
+          .filter(([spawn]) => spawn + 38 * RACER_ENEMY_PX_MS < sim.crashT)
+          .map(([spawn]) => [spawn + 38 * RACER_ENEMY_PX_MS, () => playPortamento(1400, 500, 140)])) // 擦身而過
+        .concat([
+          [sim.crashT, () => { playTone(70, 450); playPortamento(700, 60, 500); }],
+          [sim.textT, () => playMelody([[392, 150, 30], [330, 150, 30], [262, 320, 0]])]
+        ])
+        .sort((p, q) => p[0] - q[0]);
+      return sim;
+    }
+    const RACER_SIMS = RACER_PLANS.map(buildRacerSim);
+    let racerPlanIdx = 0, racerForcedPlan = null, racerCycleStartMs = 0;
+    function pickRacerPlan(nowMs) {
+      if (racerForcedPlan !== null) {
+        racerPlanIdx = racerForcedPlan;
+      } else {
+        let next;
+        do { next = Math.floor(Math.random() * RACER_SIMS.length); } while (RACER_SIMS.length > 1 && next === racerPlanIdx);
+        racerPlanIdx = next;
+      }
+      racerCycleStartMs = nowMs;
+      updateRacerPlanButtons();
+    }
+    function updateRacerPlanButtons() {
+      RACER_SIMS.forEach((_, i) => {
+        const btn = document.getElementById('btnRacerPlan' + (i + 1));
+        if (btn) btn.classList.toggle('active', currentMode === 'ALARM' && activeAlarmTheme === 'racer' && i === racerPlanIdx);
+      });
+    }
+    function playRacerPlan(i) { racerForcedPlan = i; playTheme('racer'); }
+    const RACER_DISMISS_EVENTS = [
+      [0, () => playPortamento(300, 1600, 700)],
+      [900, () => playMelody([[784, 100, 20], [988, 100, 20], [1175, 100, 20], [1568, 320, 0]])]
+    ];
+
+    function drawRacerRoad(scrollPx) {
+      for (let x = 0; x < COLS; x++) {
+        if ((x + scrollPx) % 8 < 6) { setPixel(x, 0); setPixel(x, 8); } // 護欄長虛線
+        if ((x + scrollPx) % 6 < 3) setPixel(x, 4);                     // 中央分隔虛線
+      }
+    }
+
+    function renderRacer(elapsedMs, nowMs) {
+      if (!alarmDismissed) {
+        if (racerCycleStartMs < themeStartMs || nowMs - racerCycleStartMs >= RACER_SIMS[racerPlanIdx].cycle) {
+          pickRacerPlan(nowMs);
+        }
+        const S = RACER_SIMS[racerPlanIdx];
+        const cycleMs = nowMs - racerCycleStartMs;
+        fireCycleEvents('racer', racerCycleStartMs, 1e9, cycleMs, S.events);
+
+        if (cycleMs < S.textT) {
+          const crashed = cycleMs >= S.crashT;
+          const t = Math.min(cycleMs, S.crashT); // 撞車後全場凍結
+
+          // 撞擊瞬間全螢幕白閃 80ms
+          if (crashed && cycleMs - S.crashT < 80) {
+            for (let y = 0; y < ROWS; y++) drawLine(0, y, COLS - 1, y);
+            return;
+          }
+
+          drawRacerRoad(Math.floor(t / RACER_ROAD_PX_MS));
+
+          const blinkOn = !crashed || Math.floor(nowMs / 120) % 2 === 0;
+          for (const [spawn, lane] of S.enemies) {
+            if (t < spawn) continue;
+            const ex = racerEnemyX(spawn, t);
+            if (ex < -6) continue;
+            if (blinkOn) drawSprite(RACER_CAR_ENEMY, 6, 3, ex, RACER_LANE_Y[lane]);
+          }
+
+          const py = racerPlayerYFor(S, t);
+          if (blinkOn) drawSprite(RACER_CAR_PLAYER, 6, 3, RACER_PLAYER_X, py);
+
+          if (crashed) {
+            // 撞擊點放射狀火花，兩幀交替向外擴散 (正面撞擊在車頭、側面擦撞在車身)
+            const cx = S.sparkX, cy = S.sparkY;
+            const r = (Math.floor(nowMs / 100) % 2) + 1;
+            setPixel(cx, cy - r - 1); setPixel(cx, cy + r + 1);
+            setPixel(cx - r, cy - r); setPixel(cx + r, cy - r);
+            setPixel(cx - r, cy + r); setPixel(cx + r, cy + r);
+          }
+        } else if (cycleMs < S.textT + RACER_TEXT_MS) {
+          if (Math.floor(nowMs / 150) % 2 === 0) drawTextCentered('CRASH!', 2);
+        }
+        // 最後 600ms：黑屏留白
+      } else {
+        fireCycleEvents('racerD', themeDismissStartMs, 100000, elapsedMs, RACER_DISMISS_EVENTS);
+
+        if (elapsedMs < 900) {
+          // NITRO 氮氣加速：路面狂飆、車身往前衝、尾部噴火，終點棋盤線迎面而來
+          drawRacerRoad(Math.floor(elapsedMs / 8));
+          const carX = RACER_PLAYER_X + Math.floor(elapsedMs / 70);
+          const carY = RACER_LANE_Y[1];
+          drawSprite(RACER_CAR_PLAYER, 6, 3, carX, carY);
+          const flameLen = 2 + (Math.floor(elapsedMs / 60) % 2) * 2;
+          drawLine(carX - flameLen, carY + 1, carX - 1, carY + 1);
+          setPixel(carX - 2, carY); setPixel(carX - 2, carY + 2);
+
+          const finishX = COLS + 2 - Math.floor(elapsedMs / 18);
+          for (let y = 0; y < ROWS; y++) {
+            for (let dx = 0; dx < 3; dx++) {
+              if ((dx + y) % 2 === 0) setPixel(finishX + dx, y); // 3px 寬棋盤格終點線
+            }
+          }
+        } else {
+          drawTextCentered('GOAL!', 2);
+          // 左右兩側揮舞的棋盤格旗
+          const phase = Math.floor(elapsedMs / 150) % 2;
+          for (let y = 1; y <= 7; y++) {
+            for (let x = 0; x < 4; x++) {
+              if ((x + y + phase) % 2 === 0) { setPixel(x + 1, y); setPixel(COLS - 5 + x, y); }
+            }
+          }
+        }
+      }
+    }
+
+    /* =====================================================================
+     * 13. 乒乓球 (Pong)
+     * 左側 CPU 球拍 (x=0) vs 右側玩家球拍 (x=41)，球拍高 3px，中央虛線球網；
+     * 全程依真實反彈物理逐步模擬。決勝球一律為 45° 陡角殺球，失分方「差 1 格」撲空；
+     * 玩家偶爾能反殺得分，但 CPU 永遠先拿到 3 分 -> YOU LOSE。6 組固定劇本每輪隨機輪替 (不連續重複)
+     * ===================================================================== */
+    const PONG_STEP_MS = 25;
+    // 每分 = [得分方, 決勝前的擊球數, 發球垂直方向]：擊球數達標後由得分方下一拍殺球
+    const PONG_PLANS = [
+      { label: '3-0', points: [['cpu', 1, 1], ['cpu', 0, -1], ['cpu', 1, -1]] },
+      { label: '3-1', points: [['cpu', 2, 1], ['pl', 1, -1], ['cpu', 1, 1], ['cpu', 3, -1]] },
+      { label: '3-2', points: [['pl', 1, 1], ['cpu', 1, -1], ['pl', 3, 1], ['cpu', 0, 1], ['cpu', 2, -1]] },
+      { label: '3-1', points: [['cpu', 0, -1], ['cpu', 1, 1], ['pl', 2, -1], ['cpu', 1, 1]] },
+      { label: '3-2', points: [['cpu', 1, -1], ['cpu', 2, 1], ['pl', 0, 1], ['pl', 1, -1], ['cpu', 3, 1]] },
+      { label: '3-1', points: [['pl', 2, -1], ['cpu', 2, 1], ['cpu', 0, -1], ['cpu', 1, 1]] },
+    ];
+
+    function buildPongTimeline(plan) {
+      const frames = [];
+      const clampTop = v => Math.max(0, Math.min(6, v));
+      const toward = (cur, target) => cur + Math.sign(target - cur);
+      let cpuTop = 3, plTop = 3, cpuScore = 0, plScore = 0;
+
+      // 球的垂直座標以「半格」為單位 (y2 = 0..16)，vy2 = ±1 為平緩斜角、±2 為 45° 陡角
+      const H = 16;
+      const bounce = (y2, vy2) => {
+        if (y2 < 0) return [-y2, -vy2, true];
+        if (y2 > H) return [2 * H - y2, -vy2, true];
+        return [y2, vy2, false];
+      };
+      const pix = y2 => Math.round(y2 / 2);
+      // 預測球從目前狀態一路反彈到擊球線 (玩家 x=40 / CPU x=1) 時的 y
+      const predictAt = (lineX, x, y2, vy2) => {
+        const dx = Math.sign(lineX - x);
+        while (x !== lineX) {
+          x += dx;
+          [y2, vy2] = bounce(y2 + vy2, vy2);
+        }
+        return pix(y2);
+      };
+      // 「差 1 格」站位：球拍停在球的正上方或正下方剛好擦過。
+      // pa = 球在擊球線 (x=1 / 40) 的高度、pb = 球再前進 1 步到球拍所在欄 (x=0 / 41) 的高度，兩者都不可碰到球拍
+      const justMiss = (pa, pb, cur) => {
+        const opts = [Math.max(pa, pb) + 1, Math.min(pa, pb) - 3].filter(v => v >= 0 && v <= 6);
+        if (!opts.length) throw new Error('PONG：找不到差 1 格的站位');
+        return opts.reduce((a, b) => (Math.abs(b - cur) < Math.abs(a - cur) ? b : a));
+      };
+      // 球拍 AI：球朝自己飛來並越過反應線後，才往「預測落點」移動；球離開後慢慢回中央
+      const CPU_REACT_X = 30, PL_REACT_X = 12;
+      const CPU_AIMS = [0, 1, -1, 0, -1, 1];  // 擊球點偏移 (球拍中央 / 上緣 / 下緣接球，回球角度跟著變)
+      const PL_AIMS = [0, -1, 1, 0, 1, -1];
+      let step = 0, cpuAimIdx = 0, plAimIdx = 0;
+      let serveDir = -1; // 第 1 分發向 CPU，之後發向上一分的失分方
+
+      for (const [winner, returns, serveVy] of plan.points) {
+        for (let i = 0; i < 20; i++) frames.push({ phase: 'serve', cpuTop, plTop, cpuScore, plScore });
+
+        let x = serveDir < 0 ? 21 : 20, y2 = 8, vx = serveDir, vy2 = serveVy;
+        let hits = 0, cpuMiss = null, plMiss = null;
+        let cpuAim = CPU_AIMS[cpuAimIdx++ % CPU_AIMS.length], plAim = PL_AIMS[plAimIdx++ % PL_AIMS.length];
+        let scorer = null;
+        while (frames.length < 20000) {
+          let snd = null;
+          step++;
+          if (vx < 0 && x <= CPU_REACT_X) {
+            if (step % 2 === 0) cpuTop = toward(cpuTop, cpuMiss !== null ? cpuMiss : clampTop(predictAt(1, x, y2, vy2) - 1 + cpuAim));
+          } else if (vx > 0 && step % 4 === 0) {
+            cpuTop = toward(cpuTop, 3);
+          }
+          if (vx > 0 && x >= PL_REACT_X) {
+            plTop = toward(plTop, plMiss !== null ? plMiss : clampTop(predictAt(40, x, y2, vy2) - 1 + plAim));
+          } else if (vx < 0 && step % 3 === 0) {
+            plTop = toward(plTop, 3);
+          }
+
+          // 球前進 + 上下牆反彈
+          x += vx;
+          let hitWall;
+          [y2, vy2, hitWall] = bounce(y2 + vy2, vy2);
+          if (hitWall) snd = 'wall';
+          const y = pix(y2);
+
+          // 擊球：一般來回維持平緩斜角 (±1，方向依擊球點)；決勝殺球為 45° 陡角 (±2)
+          const cpuHit = x === 1 && vx < 0 && cpuMiss === null && y >= cpuTop && y <= cpuTop + 2;
+          const plHit = x === 40 && vx > 0 && plMiss === null && y >= plTop && y <= plTop + 2;
+          if (cpuHit || plHit) {
+            const top = cpuHit ? cpuTop : plTop;
+            const off = y - (top + 1);
+            const dir = off !== 0 ? Math.sign(off) : Math.sign(vy2);
+            vx = cpuHit ? 1 : -1;
+            vy2 = dir;
+            snd = 'paddle';
+            if (hits >= returns && winner === (cpuHit ? 'cpu' : 'pl')) {
+              vy2 = dir * 2;
+              snd = cpuHit ? 'smash' : 'plsmash';
+              if (cpuHit) plMiss = justMiss(predictAt(40, x, y2, vy2), predictAt(41, x, y2, vy2), plTop);
+              else cpuMiss = justMiss(predictAt(1, x, y2, vy2), predictAt(0, x, y2, vy2), cpuTop);
+            }
+            hits++;
+            if (cpuHit) plAim = PL_AIMS[plAimIdx++ % PL_AIMS.length];
+            else cpuAim = CPU_AIMS[cpuAimIdx++ % CPU_AIMS.length];
+          }
+
+          if (x > 41 || x < 0) {
+            scorer = x > 41 ? 'cpu' : 'pl';
+            if (scorer === 'cpu') cpuScore++; else plScore++;
+            frames.push({ phase: 'rally', cpuTop, plTop, cpuScore, plScore, snd: scorer === 'cpu' ? 'miss' : 'plpoint' });
+            break;
+          }
+          frames.push({ phase: 'rally', x, y, cpuTop, plTop, cpuScore, plScore, snd });
+        }
+        if (scorer !== winner) throw new Error(`PONG 劇本 ${plan.label}：預期 ${winner} 得分，實際 ${scorer}`);
+        serveDir = scorer === 'cpu' ? 1 : -1;
+
+        for (let i = 0; i < 32; i++) frames.push({ phase: 'score', cpuTop, plTop, cpuScore, plScore, scorer });
+      }
+      if (cpuScore !== 3) throw new Error(`PONG 劇本 ${plan.label}：CPU 最終應為 3 分`);
+      for (let i = 0; i < 64; i++) frames.push({ phase: 'lose' });
+      for (let i = 0; i < 16; i++) frames.push({ phase: 'blank' });
+      return frames;
+    }
+
+    const PONG_SIMS = PONG_PLANS.map(plan => {
+      const frames = buildPongTimeline(plan);
+      const events = [];
+      frames.forEach((f, i) => {
+        const t = i * PONG_STEP_MS;
+        if (f.snd === 'paddle') events.push([t, () => playTone(460, 40)]);
+        if (f.snd === 'smash') events.push([t, () => playTone(920, 60)]);
+        if (f.snd === 'plsmash') events.push([t, () => { playTone(1040, 50); playPortamento(1200, 2400, 90); }]);
+        if (f.snd === 'wall') events.push([t, () => playTone(230, 40)]);
+        if (f.snd === 'miss') events.push([t, () => { playTone(490, 260); setTimeout(() => playTone(120, 300), 260); }]);
+        if (f.snd === 'plpoint') events.push([t, () => playMelody([[784, 80, 20], [1047, 80, 20], [1319, 160, 0]])]);
+        if (f.phase === 'lose' && frames[i - 1].phase !== 'lose') {
+          events.push([t, () => playMelody([[330, 160, 40], [294, 160, 40], [262, 160, 40], [196, 400, 0]])]);
+        }
+      });
+      return { label: plan.label, frames, events, cycle: frames.length * PONG_STEP_MS };
+    });
+
+    let pongPlanIdx = 0, pongForcedPlan = null, pongCycleStartMs = 0;
+    function pickPongPlan(nowMs) {
+      if (pongForcedPlan !== null) {
+        pongPlanIdx = pongForcedPlan;
+      } else {
+        let next;
+        do { next = Math.floor(Math.random() * PONG_SIMS.length); } while (PONG_SIMS.length > 1 && next === pongPlanIdx);
+        pongPlanIdx = next;
+      }
+      pongCycleStartMs = nowMs;
+      updatePongPlanButtons();
+    }
+    function updatePongPlanButtons() {
+      PONG_SIMS.forEach((_, i) => {
+        const btn = document.getElementById('btnPongPlan' + (i + 1));
+        if (btn) btn.classList.toggle('active', currentMode === 'ALARM' && activeAlarmTheme === 'pong' && i === pongPlanIdx);
+      });
+    }
+    function playPongPlan(i) { pongForcedPlan = i; playTheme('pong'); }
+    const PONG_DISMISS_EVENTS = [
+      [0, () => { playTone(920, 60); playPortamento(1500, 3000, 200); }],
+      [480, () => playTone(1568, 120)],
+      [700, () => playMelody([[1047, 90, 20], [1319, 90, 20], [1568, 280, 0]])]
+    ];
+
+    function drawPongNet() {
+      for (let y = 1; y < ROWS; y += 2) { setPixel(20, y); setPixel(21, y); }
+    }
+
+    function renderPong(elapsedMs, nowMs) {
+      if (!alarmDismissed) {
+        if (pongCycleStartMs < themeStartMs || nowMs - pongCycleStartMs >= PONG_SIMS[pongPlanIdx].cycle) {
+          pickPongPlan(nowMs);
+        }
+        const S = PONG_SIMS[pongPlanIdx];
+        const cycleMs = nowMs - pongCycleStartMs;
+        fireCycleEvents('pong', pongCycleStartMs, 1e9, cycleMs, S.events);
+        const f = S.frames[Math.min(S.frames.length - 1, Math.floor(cycleMs / PONG_STEP_MS))];
+
+        if (f.phase === 'serve' || f.phase === 'rally' || f.phase === 'score') {
+          drawPongNet();
+          drawLine(0, f.cpuTop, 0, f.cpuTop + 2);
+          drawLine(41, f.plTop, 41, f.plTop + 2);
+        }
+        if (f.phase === 'serve') {
+          if (Math.floor(nowMs / 150) % 2 === 0) setPixel(21, 4); // 發球前球心閃爍
+        } else if (f.phase === 'rally') {
+          if (f.x !== undefined) setPixel(f.x, f.y);
+        } else if (f.phase === 'score') {
+          // 比分：CPU 在左、玩家在右；剛得分的一方數字閃爍
+          const blinkOff = Math.floor(nowMs / 150) % 2 === 1;
+          if (!(f.scorer === 'cpu' && blinkOff)) drawDigit(f.cpuScore, 14, 2);
+          if (!(f.scorer === 'pl' && blinkOff)) drawDigit(f.plScore, 25, 2);
+        } else if (f.phase === 'lose') {
+          if (Math.floor(nowMs / 200) % 2 === 0) drawTextCentered('YOU LOSE', 2);
+        }
+      } else {
+        fireCycleEvents('pongD', themeDismissStartMs, 100000, elapsedMs, PONG_DISMISS_EVENTS);
+
+        if (elapsedMs < 700) {
+          drawPongNet();
+          // 玩家球拍蓄力閃爍，球帶殘影直線爆射向左
+          if (elapsedMs > 120 || Math.floor(elapsedMs / 40) % 2 === 0) drawLine(41, 3, 41, 5);
+          const bx = 40 - Math.floor(elapsedMs / 12);
+          if (bx >= 0) {
+            setPixel(bx, 4);
+            if (Math.floor(elapsedMs / 50) % 2 === 0) drawLine(bx + 1, 4, Math.min(40, bx + 8), 4);
+          }
+          // CPU 球拍慢半拍從頂端追下來，撲空
+          const cpuTop = Math.min(3, Math.floor(elapsedMs / 160));
+          drawLine(0, cpuTop, 0, cpuTop + 2);
+          // 球擊穿左側底線：整條底線白閃
+          if (bx < 0 && Math.floor(elapsedMs / 60) % 2 === 0) drawLine(0, 0, 0, 8);
+        } else {
+          drawTextCentered('SMASH!', 2);
+          if (Math.floor(elapsedMs / 150) % 2 === 0) {
+            setPixel(3, 1); setPixel(2, 2); setPixel(4, 2); setPixel(3, 3);
+            setPixel(38, 5); setPixel(37, 6); setPixel(39, 6); setPixel(38, 7);
+          }
+        }
+      }
+    }
+
+    /* =====================================================================
+     * 10. 笨鳥先飛 (Flappy Bird)
+     * 真實重力 + 拍翅物理逐 tick 預先模擬：小鳥 (4x2, 固定 x=8..11) 由自動駕駛穿過前幾根水管，
+     * 最後一根失手 (drop = 拍翅太晚掉進下水管 / over = 拍過頭撞上水管) -> 白閃 -> 下墜落地 -> GAME OVER -> SCORE
+     * 水管：管身 3px (中間鏤空條紋) + 管口 5px，上下開口 4 格；每 60ms 捲動 1px，間距 15px
+     * ===================================================================== */
+    const FLAPPY_TICK = 30;
+    const FLAPPY_BIRD_X = 8;
+    const FLAPPY_G = 0.08, FLAPPY_FLAP_V = -0.55, FLAPPY_VMAX = 0.7;
+    const FLAPPY_SCROLL_TICKS = 2;
+    const FLAPPY_SPACING = 15;
+    const FLAPPY_FIRST_X = 40;
+    const FLAPPY_GAP = 5;
+    // gaps = 各水管開口最上排 y (0..3；0 = 只有下水管、3 = 只有上水管)，最後一根為失手水管；分數 = 水管數 - 1
+    const FLAPPY_PLANS = [
+      { gaps: [1, 3, 0, 2, 0], fail: 'drop' },
+      { gaps: [2, 0, 1, 3], fail: 'over' },
+      { gaps: [0, 3, 1, 0, 2, 0], fail: 'drop' },
+      { gaps: [1, 0, 3, 2, 1], fail: 'over' },
+    ];
+
+    const flappyPipeX = (i, scroll) => FLAPPY_FIRST_X + i * FLAPPY_SPACING - scroll;
+    function flappyPipeAt(px, gap, x, y) {
+      if (y < 0 || y > 7) return false;
+      const lower = gap + FLAPPY_GAP;
+      if (y >= gap && y < lower) return false;
+      const lip = (y === gap - 1 || y === lower);
+      return lip ? (x >= px - 1 && x <= px + 3) : (x >= px && x <= px + 2);
+    }
+    function drawFlappyPipe(px, gap) {
+      const lower = gap + FLAPPY_GAP;
+      for (let y = 0; y <= 7; y++) {
+        if (y >= gap && y < lower) continue;
+        if (y === gap - 1 || y === lower) { drawLine(px - 1, y, px + 3, y); continue; }
+        setPixel(px, y); setPixel(px + 2, y);  // 管身左右壁 (中間鏤空)
+      }
+    }
+    // 小鳥：身體 4x3 圓胖 (x..x+3) + 眼睛留白 (x+2, y+1) + 鳥嘴 (x+3, y+1..y+2)；翅膀在身體中段 (x+1) 上下拍動
+    //   .#..      wing 0 = 上揚：背上伸出 (x+1, y-1)
+    //   ###.      wing 1 = 平舉：收在身體裡 (不額外畫)
+    //   ##.#      wing 2 = 下壓：肚子下伸出 (x+1, y+3)
+    //   ####
+    //   .#..
+    // blocked(px, py)：翅膀那點或其左右鄰格碰到水管 / 地面 / 出界時改為平舉，避免看起來像擦到管口 (翅膀不列入碰撞)
+    function drawFlappyBird(x, y, wing, blocked) {
+      drawLine(x, y, x + 2, y);
+      setPixel(x, y + 1); setPixel(x + 1, y + 1); setPixel(x + 3, y + 1);
+      drawLine(x, y + 2, x + 3, y + 2);
+      if (wing === 1) return;
+      const wy = wing === 0 ? y - 1 : y + 3;
+      if (wy < 0 || wy > 7) return;
+      if (blocked && (blocked(x, wy) || blocked(x + 1, wy) || blocked(x + 2, wy))) return;
+      setPixel(x + 1, wy);
+    }
+    const flappyPipesBlock = (gaps, xOf) => (px, py) => gaps.some((g, i) => flappyPipeAt(xOf(i), g, px, py));
+    const flappyWing = tick => [0, 1, 2, 1][Math.floor(tick / 3) % 4];
+    // 死亡小鳥：身體轉 90 度頭朝下 (3x4)
+    function drawFlappyDeadBird(x, y) {
+      drawLine(x, y, x + 2, y); drawLine(x, y + 1, x + 2, y + 1);
+      setPixel(x, y + 2); setPixel(x + 2, y + 2);
+      setPixel(x, y + 3); setPixel(x + 1, y + 3);
+    }
+    function drawFlappyGround(scroll) {
+      for (let x = 0; x < COLS; x++) if ((x + scroll) % 3 !== 0) setPixel(x, 8);
+    }
+
+    function buildFlappySim(plan) {
+      const n = plan.gaps.length, T = FLAPPY_TICK;
+      const frames = [], events = [];
+      let y = 3, vy = 0, lastFlap = -99, passed = 0, crash = null;
+      for (let tick = 0; tick < 3000 && !crash; tick++) {
+        const scroll = Math.floor(tick / FLAPPY_SCROLL_TICKS);
+        let ni = 0;
+        while (ni < n && flappyPipeX(ni, scroll) + 3 < FLAPPY_BIRD_X) ni++;
+        while (passed < ni) {
+          passed++;
+          events.push([tick * T, () => playTone(988, 50)], [tick * T + 60, () => playTone(1319, 110)]);
+        }
+        // 自動駕駛：瞄準下一根水管開口中央
+        const target = ni < n ? plan.gaps[ni] + 1 : 3;
+        const dist = ni < n ? flappyPipeX(ni, scroll) - 1 - (FLAPPY_BIRD_X + 3) : 99;
+        let flap = y > target + 0.8 && vy >= 0 && tick - lastFlap >= 5;
+        if (ni === n - 1 && plan.fail === 'drop' && dist <= 3) flap = false;               // 失手：該拍沒拍
+        if (ni === n - 1 && plan.fail === 'over' && dist <= 9) flap = y > target - 1.5 && tick - lastFlap >= 4; // 失手：狂拍過頭
+        if (flap) {
+          vy = FLAPPY_FLAP_V; lastFlap = tick;
+          events.push([tick * T, () => playPortamento(420, 780, 50)]);
+        }
+        vy = Math.min(vy + FLAPPY_G, FLAPPY_VMAX);
+        y += vy;
+        if (y < 0) { y = 0; vy = 0; }
+        const by = Math.round(y);
+        frames.push({ y: by, scroll, wing: tick - lastFlap < 3 ? 2 : flappyWing(tick) });
+        // 碰撞：地面 or 水管 (以 4x2 外框判定)
+        let hit = by + 2 >= 8 ? 'ground' : null;
+        for (let i = 0; i < n && !hit; i++) {
+          const px = flappyPipeX(i, scroll);
+          for (let dx = 0; dx < 4 && !hit; dx++) {
+            for (let dy = 0; dy < 3 && !hit; dy++) {
+              if (flappyPipeAt(px, plan.gaps[i], FLAPPY_BIRD_X + dx, by + dy)) hit = i;
+            }
+          }
+        }
+        if (hit !== null) crash = { tick, hit, y: by, scroll };
+      }
+      const crashMs = crash.tick * T;
+      // 下墜：停頓 250ms 後從撞擊高度自由落體，2x3 死鳥落到 y=5..7
+      const fallStart = crashMs + 250;
+      const fall = [];
+      let fy = crash.y, fvy = 0;
+      while (fy < 4) { fvy = Math.min(fvy + FLAPPY_G * 1.5, 1.2); fy = Math.min(4, fy + fvy); fall.push(Math.round(fy)); }
+      const landMs = fallStart + fall.length * T;
+      const overMs = landMs + 600, scoreMs = overMs + 1500, endMs = scoreMs + 1300;
+      events.push(
+        [crashMs, () => playTone(140, 110)],
+        [fallStart, () => playPortamento(620, 140, Math.max(200, fall.length * T))],
+        [landMs, () => playTone(80, 90)],
+        [overMs, () => playMelody([[523, 110, 30], [392, 110, 30], [330, 110, 30], [262, 260, 0]])],
+        [scoreMs, () => playMelody([[660, 60, 40], [660, 60, 0]])]
+      );
+      events.sort((a, b) => a[0] - b[0]);
+      return { plan, frames, crash, crashMs, fallStart, fall, landMs, overMs, scoreMs, cycle: endMs, score: n - 1, events };
+    }
+    const FLAPPY_SIMS = FLAPPY_PLANS.map(buildFlappySim);
+
+    let flappyPlanIdx = 0, flappyCycleStartMs = 0, flappyForcedPlan = null;
+    function renderFlappy(elapsedMs, nowMs) {
+      if (!alarmDismissed) {
+        if (flappyCycleStartMs < themeStartMs || nowMs - flappyCycleStartMs >= FLAPPY_SIMS[flappyPlanIdx].cycle) {
+          let next;
+          do { next = Math.floor(Math.random() * FLAPPY_SIMS.length); } while (FLAPPY_SIMS.length > 1 && next === flappyPlanIdx);
+          flappyPlanIdx = flappyForcedPlan !== null ? flappyForcedPlan : next;
+          flappyCycleStartMs = nowMs;
+        }
+        const S = FLAPPY_SIMS[flappyPlanIdx];
+        const t = nowMs - flappyCycleStartMs;
+        fireCycleEvents('flappy', flappyCycleStartMs, 1e9, t, S.events);
+
+        if (t < S.overMs) {
+          const alive = t < S.crashMs;
+          const f = alive ? S.frames[Math.min(S.frames.length - 1, Math.floor(t / FLAPPY_TICK))] : null;
+          const scroll = alive ? f.scroll : S.crash.scroll;
+          S.plan.gaps.forEach((g, i) => {
+            const px = flappyPipeX(i, scroll);
+            if (px > -5 && px < COLS + 1) drawFlappyPipe(px, g);
+          });
+          drawFlappyGround(scroll);
+          if (alive) {
+            drawFlappyBird(FLAPPY_BIRD_X, f.y, f.wing, flappyPipesBlock(S.plan.gaps, i => flappyPipeX(i, scroll)));
+          } else if (t < S.fallStart) {
+            if (t - S.crashMs < 80) { for (let y = 0; y < ROWS; y++) drawLine(0, y, COLS - 1, y); } // 撞擊白閃
+            else drawFlappyBird(FLAPPY_BIRD_X, S.crash.y, 1);
+          } else {
+            const k = Math.floor((t - S.fallStart) / FLAPPY_TICK);
+            const dy = k < S.fall.length ? S.fall[k] : 4;
+            drawFlappyDeadBird(FLAPPY_BIRD_X, dy);
+            // 落地後頭上轉圈星星
+            if (t >= S.landMs && Math.floor(nowMs / 150) % 2 === 0) {
+              setPixel(FLAPPY_BIRD_X - 1, 3); setPixel(FLAPPY_BIRD_X + 4, 2); setPixel(FLAPPY_BIRD_X + 1, 1);
+            } else if (t >= S.landMs) {
+              setPixel(FLAPPY_BIRD_X - 1, 2); setPixel(FLAPPY_BIRD_X + 4, 3); setPixel(FLAPPY_BIRD_X + 2, 1);
+            }
+          }
+        } else if (t < S.scoreMs) {
+          drawTextCentered('GAME OVER', 2);
+        } else if (t < S.cycle - 300) {
+          drawTextCentered('SCORE ' + S.score, 2);
+        }
+      } else {
+        // 按鍵解除：無敵模式高速穿越 3 根水管 (每根叮一聲、音階上升) -> PASS!
+        fireCycleEvents('flappyD', themeDismissStartMs, 100000, elapsedMs, FLAPPY_DISMISS_EVENTS);
+        if (elapsedMs < 1150) {
+          const scroll = Math.floor(elapsedMs / 25);
+          FLAPPY_DISMISS_GAPS.forEach((g, i) => {
+            const px = 16 + i * 14 - scroll;
+            if (px > -5 && px < COLS + 1) drawFlappyPipe(px, g);
+          });
+          drawFlappyGround(scroll);
+          drawFlappyBird(FLAPPY_BIRD_X, flappyDismissY(elapsedMs), flappyWing(Math.floor(elapsedMs / 20)), flappyPipesBlock(FLAPPY_DISMISS_GAPS, i => 16 + i * 14 - scroll));
+          // 身後速度線
+          if (Math.floor(elapsedMs / 50) % 2 === 0) { setPixel(FLAPPY_BIRD_X - 2, flappyDismissY(elapsedMs) + 1); setPixel(FLAPPY_BIRD_X - 4, flappyDismissY(elapsedMs) + 1); }
+        } else {
+          drawFlappyBird(5, 3, flappyWing(Math.floor(elapsedMs / 40)));
+          drawText('PASS!', 14, 2);
+          if (Math.floor(elapsedMs / 150) % 2 === 0) {
+            setPixel(36, 1); setPixel(35, 2); setPixel(37, 2); setPixel(36, 3);
+            setPixel(10, 6); setPixel(9, 7); setPixel(11, 7); setPixel(10, 5);
+          }
+          drawFlappyGround(46);
+        }
+      }
+    }
+    // 解除動畫：3 根水管 x = 16 / 30 / 44 起，每 25ms 捲 1px；小鳥在穿管期間對準開口，管與管之間平滑換高度
+    const FLAPPY_DISMISS_GAPS = [0, 2, 1];
+    function flappyDismissY(ms) {
+      const s = ms / 25;
+      const keys = [];
+      FLAPPY_DISMISS_GAPS.forEach((g, i) => {
+        const x0 = 16 + i * 14;
+        keys.push([x0 - 12, g + 1], [x0 - 4, g + 1]); // 管口進入鳥前緣 -> 管尾離開鳥後緣
+      });
+      if (s <= keys[0][0]) return Math.round(3 + (keys[0][1] - 3) * Math.max(0, s / Math.max(1, keys[0][0])));
+      for (let k = 0; k < keys.length - 1; k++) {
+        const [s0, y0] = keys[k], [s1, y1] = keys[k + 1];
+        if (s <= s1) {
+          const p = (s - s0) / (s1 - s0);
+          return Math.round(y0 + (y1 - y0) * (1 - Math.cos(p * Math.PI)) / 2);
+        }
+      }
+      return keys[keys.length - 1][1];
+    }
+    const FLAPPY_DISMISS_EVENTS = [
+      [0, () => playPortamento(500, 1200, 90)],
+      [300, () => playTone(1047, 50)], [360, () => playTone(1319, 100)],
+      [650, () => playTone(1175, 50)], [710, () => playTone(1568, 100)],
+      [1000, () => playTone(1319, 50)], [1060, () => playTone(1760, 100)],
+      [1150, () => playMelody([[784, 80, 20], [988, 80, 20], [1319, 80, 20], [1568, 220, 0]])],
+    ];
+
+    /* =====================================================================
+     * 7. 畫面主迴圈渲染 (每秒 30 幀)
+     * ===================================================================== */
+    function gameLoop() {
+      clearBuffer();
+      animTimer++;
+      monUpdate(performance.now()); // 寵物世界不論顯示哪個模式都持續運作
+
+      // A. 一般時鐘模式 (支援「原廠 / VIPnytt」與「折衷版」即時切換)
+      if (currentMode === 'CLOCK') {
+        const d = new Date();
+        const h = d.getHours();
+        const m = d.getMinutes();
+        const s = d.getSeconds();
+
+        // 側邊指示燈
+        document.getElementById('indAM').classList.toggle('active', h < 12);
+        document.getElementById('indPM').classList.toggle('active', h >= 12);
+
+        const h1 = Math.floor(h / 10);
+        const h2 = h % 10;
+        const m1 = Math.floor(m / 10);
+        const m2 = m % 10;
+
+        // 樣式 A：IKEA 原廠 / VIPnytt/Kortlinje (7x9 雙線加粗 HH:MM + 正中央 2x2 恆亮冒號)
+        if (currentClockStyle === 'original') {
+          drawKortlinjeDigit(h1, h1 === 1 ? 1 : 0, 0);
+          drawKortlinjeDigit(h2, 9, 0);
+
+          for (const cy of [1, 2, 6, 7]) {
+            setPixel(20, cy);
+            setPixel(21, cy);
+          }
+
+          drawKortlinjeDigit(m1, m1 === 1 ? 27 : 26, 0);
+          drawKortlinjeDigit(m2, 35, 0);
+        }
+
+        // 樣式 B：折衷版 (原廠雙線粗胖結構 6x9 HH:MM + 2x2 恆亮冒號 + 右下角 3x5 小秒數)
+        else if (currentClockStyle === 'hybrid') {
+          drawSprite(KORTLINJE_BOLD_6x9[h1], 6, 9, 1, 0);
+          drawSprite(KORTLINJE_BOLD_6x9[h2], 6, 9, 8, 0);
+
+          // 2x2 原廠粗冒號 (恆亮)
+          for (const cy of [1, 2, 6, 7]) {
+            setPixel(15, cy);
+            setPixel(16, cy);
+          }
+
+          drawSprite(KORTLINJE_BOLD_6x9[m1], 6, 9, 18, 0);
+          drawSprite(KORTLINJE_BOLD_6x9[m2], 6, 9, 25, 0);
+
+          // 右下角 3x5 小秒數 (與分針留有 3 格呼吸間距，位於 x=34, 38, y=4..8)
+          drawSprite(TINY_SECONDS_3x5[Math.floor(s / 10)], 3, 5, 34, 4);
+          drawSprite(TINY_SECONDS_3x5[s % 10], 3, 5, 38, 4);
+        }
+      }
+
+      // B. 像素怪獸養成模式
+      else if (currentMode === 'TAMA') {
+        document.getElementById('indAM').classList.remove('active');
+        document.getElementById('indPM').classList.remove('active');
+        renderMonster(performance.now());
+      }
+
+      // C. 13 大復古鬧鐘主題演出 (全部改以真實毫秒 elapsedMs 驅動，速度平穩清晰)
+      else if (currentMode === 'ALARM') {
+        const nowMs = performance.now();
+        const elapsedMs = alarmDismissed ? (nowMs - themeDismissStartMs) : (nowMs - themeStartMs);
+
+        // 1. 小精靈 (Pac-Man)：4 種場景機率切換 (40/40/10/10，場景3後場景4為90%)，每場景皆為 3 隻幽靈
+        if (activeAlarmTheme === 'pacman') {
+          const mouthCycle = [SPRITES.pacClose, SPRITES.pacMid, SPRITES.pacOpen, SPRITES.pacMid];
+
+          if (!alarmDismissed) {
+            const stepDurMs = (pacmanVariant === 4) ? 90 : 120;
+            let step = Math.floor((nowMs - pacmanPassStartMs) / stepDurMs);
+            // 當一趟 (80 步) 完整走完畫面後，自動依機率抽取下一趟場景（若剛播完場景 3，將以 90% 機率進入場景 4，播完後回復原機率）
+            if (step >= 80) {
+              pacmanPassStartMs = nowMs;
+              step = 0;
+              pacmanVariant = rollPacmanVariant();
+              updatePacmanVariantButtons(pacmanVariant);
+              document.getElementById('modeDesc').textContent = `🟡 小精靈鬧鐘 — 本次顯示【${PACMAN_VARIANT_NAMES[pacmanVariant]}】`;
+            }
+
+            const pacS = mouthCycle[step % 4];
+
+            // 場景 1：預設從左至右（無能量球，5 顆豆子 + 後方 3 隻幽靈追逐）
+            if (pacmanVariant === 1) {
+              const pacX = step - 7;
+              for (let dotX = 6; dotX <= 38; dotX += 8) {
+                if (dotX > pacX + 5) setPixel(dotX, 4);
+              }
+              drawSprite(pacS, 7, 7, pacX, 1, false);
+              for (let i = 0; i < 3; i++) {
+                drawSprite(SPRITES.ghost1, 7, 7, pacX - 10 - i * 9, 1, false);
+              }
+            }
+            // 場景 2：從右至左（無能量球，5 顆豆子 + 後方 3 隻幽靈追逐）
+            else if (pacmanVariant === 2) {
+              const pacX = 42 - step;
+              for (let dotX = 3; dotX <= 35; dotX += 8) {
+                if (dotX < pacX + 1) setPixel(dotX, 4);
+              }
+              drawSprite(pacS, 7, 7, pacX, 1, true);
+              for (let i = 0; i < 3; i++) {
+                drawSprite(SPRITES.ghost1, 7, 7, pacX + 10 + i * 9, 1, true);
+              }
+            }
+            // 場景 3：從左至右（含能量球，後方 3 隻幽靈維持一般外觀不主動變為驚嚇狀態）
+            else if (pacmanVariant === 3) {
+              const pacX = step - 7;
+              for (let dotX = 6; dotX <= 30; dotX += 8) {
+                if (dotX > pacX + 5) setPixel(dotX, 4);
+              }
+              if (pacX + 5 < 37 && (Math.floor(nowMs / 200) % 2 === 0)) {
+                drawSprite(SPRITES.pellet, 3, 3, 37, 3);
+              }
+              drawSprite(pacS, 7, 7, pacX, 1, false);
+              for (let i = 0; i < 3; i++) {
+                drawSprite(SPRITES.ghost1, 7, 7, pacX - 10 - i * 9, 1, false);
+              }
+            }
+            // 場景 4：右至左的追擊模式（加速為 90ms/格，3 隻受驚嚇幽靈在前逃跑，小精靈在最後方追擊）
+            else if (pacmanVariant === 4) {
+              const ghostLeadX = 42 - step;
+              for (let i = 0; i < 3; i++) {
+                drawSprite(SPRITES.ghostScared, 7, 7, ghostLeadX + i * 9, 1, false);
+              }
+              drawSprite(pacS, 7, 7, ghostLeadX + 28, 1, true);
+            }
+          } else {
+            // 按鍵解除鬧鐘時的反轉追擊彩蛋（90ms/格，小精靈追擊 3 隻受驚嚇幽靈）
+            const revStep = Math.floor(elapsedMs / 90);
+            const ghostLeadX = 12 - revStep;
+            const pacS = mouthCycle[revStep % 4];
+            for (let i = 0; i < 3; i++) {
+              drawSprite(SPRITES.ghostScared, 7, 7, ghostLeadX + i * 9, 1, false);
+            }
+            drawSprite(pacS, 7, 7, ghostLeadX + 28, 1, true);
+          }
+        }
+
+        // 2. Chrome 斷網恐龍 (每 60ms 快速奔馳，視差動態背景)
+        else if (activeAlarmTheme === 'dino') {
+          const step = Math.floor(elapsedMs / 60);
+
+          // 天空背景：多層次多樣化視差雲朵群（移除太陽，以高高低低、不同尺寸與速度的雲朵營造景深）
+          // 雲朵位置以「每 DINO_LOOP_MS 剛好走完整數圈」換算，整個畫面每 17280ms (6 顆仙人掌) 完全循環一次，方便韌體寫死成固定動畫
+          const cloudX = (w, laps, phase) => 42 - ((Math.floor(elapsedMs * w * laps / DINO_LOOP_MS) + phase) % w);
+          // 1. 遠景高空雙峰大雲 (8x3, y=0, 270ms/格 慢速飄移)
+          const cloud1X = cloudX(64, 1, 0);
+          drawSprite(SPRITES.cloudLarge, 8, 3, cloud1X, 0);
+
+          // 2. 中景蓬鬆中型雲 (6x2, y=1, 約 180ms/格 中速飄移，錯開相位)
+          const cloud2X = cloudX(48, 2, 28);
+          drawSprite(SPRITES.cloudMed, 6, 2, cloud2X, 1);
+
+          // 3. 近景迷你小輕雲 (4x2, y=2, 約 131ms/格 輕快飄移，錯開相位)
+          const cloud3X = cloudX(66, 2, 12);
+          drawSprite(SPRITES.cloudSmall, 4, 2, cloud3X, 2);
+
+          // 地面平整實線 (y=8，乾淨無碎石)
+          for (let x = 0; x < COLS; x++) setPixel(x, 8);
+
+          // 矮仙人掌 (5x4，底部在 y=7，緊貼 y=8 地板)
+          const cactusX = 42 - (step % 48);
+          drawSprite(SPRITES.cactus, 5, 4, cactusX, 4);
+
+          // 迅捷跳躍拋物線 (跨越僅 9 格，最高 y=-4 超出頂部，滯空僅 120ms，告別慢動作)
+          let dinoY = 1;
+          let inAir = false;
+          if (alarmDismissed) {
+            dinoY = -3;
+            inAir = true;
+          } else if (cactusX >= 1 && cactusX <= 9) {
+            inAir = true;
+            if (cactusX === 9) {
+              dinoY = -1;  // 敏捷起跳
+            } else if (cactusX >= 7) {
+              dinoY = -3;  // 騰空衝刺
+            } else if (cactusX >= 5) {
+              dinoY = -4;  // 頂峰滯空 (僅 2 格約 120ms，超邊界流暢翻越)
+            } else if (cactusX >= 3) {
+              dinoY = -2;  // 疾速下墜
+            } else { // cactusX === 2
+              dinoY = 0;   // 緩衝落地
+            }
+          }
+
+          // 最前景圖層：繪製小恐龍（空中保持立姿，地面雙腳 90ms 輕快交替）
+          const dinoS = inAir 
+            ? SPRITES.dinoStand 
+            : ((Math.floor(nowMs / 90) % 2 === 0) ? SPRITES.dinoRun1 : SPRITES.dinoRun2);
+          drawSprite(dinoS, 7, 7, 4, dinoY);
+          // 強制挖空恐龍眼睛像素 (x = 4 + 3 = 7, y = dinoY + 1)，確保與背景雲朵重疊時眼睛永遠保持空白
+          setPixel(7, dinoY + 1, 0);
+        }
+
+        // 3. 超級馬力歐 (World 1-1 經典橫向捲軸全景地圖：實心磚塊平台、旋轉金幣、小巧栗寶寶、高低水管、無敵星星、終點旗桿與城堡)
+        else if (activeAlarmTheme === 'mario') {
+          if (!alarmDismissed) {
+            // 攝影機每 70ms 向右捲動 1 像素，整張 World 1-1 濃縮地圖循環播放
+            const camX = (Math.floor(elapsedMs / 70) % 140) - 18;
+            const wx = (worldX) => worldX - camX; // 將世界座標轉為螢幕座標
+
+            // 地面實線 (y=8)，在 worldX = 76..79 留出經典「跳躍深淵坑洞 (Pit)」
+            for (let sx = 0; sx < COLS; sx++) {
+              const worldPos = sx + camX;
+              if (worldPos < 76 || worldPos > 79) {
+                setPixel(sx, 8);
+              }
+            }
+
+            // 旋轉金幣動畫幀 (4 拍立體翻轉)
+            const coinFrames = [SPRITES.marioCoin1, SPRITES.marioCoin2, SPRITES.marioCoin3, SPRITES.marioCoin2];
+            const coinS = coinFrames[Math.floor(nowMs / 110) % 4];
+            // 小巧栗寶寶 (5x4) 雙腳踏步幀與巡邏位移
+            const goombaS = (Math.floor(nowMs / 180) % 2 === 0) ? SPRITES.marioGoomba1 : SPRITES.marioGoomba2;
+            const patrolOffset = Math.floor(nowMs / 220) % 4; // 小範圍巡邏位移 (0..3)
+
+            // [區塊 1] 開場實心懸空小磚塊 (3x3 奇數寬，x=6, y=3) + 上方正中心彈跳金幣 (3x4，x=6)
+            const b1Bounce = (Math.floor(nowMs / 350) % 4 === 0) ? -1 : 0;
+            drawSprite(SPRITES.marioBrick, 3, 3, wx(6), 3 + b1Bounce);
+            if (b1Bounce === -1) {
+              drawSprite(coinS, 3, 4, wx(6), -1);
+            }
+
+            // [區塊 2] 第一隻小巧栗寶寶巡邏 (5x4，x=14..17, y=4..7 緊貼地面)
+            drawSprite(goombaS, 5, 4, wx(14 + patrolOffset), 4);
+
+            // [區塊 3] 經典三連實心小磚塊平台 (各 3x3 奇數寬，留 1px 磚縫：x=24, 28, 32, y=4) & 上方正中心對齊三連旋轉金幣 (x=24, 28, 32, y=0)
+            drawSprite(SPRITES.marioBrick, 3, 3, wx(24), 4);
+            drawSprite(SPRITES.marioBrick, 3, 3, wx(28), 4);
+            drawSprite(SPRITES.marioBrick, 3, 3, wx(32), 4);
+            drawSprite(coinS, 3, 4, wx(24), 0);
+            drawSprite(coinS, 3, 4, wx(28), 0);
+            drawSprite(coinS, 3, 4, wx(32), 0);
+
+            // [區塊 4] 水管峽谷：矮水管 (x=45, 7x4) + 谷間小巧栗寶寶巡邏 (5x4, x=56..59, y=4..7) + 高水管 (x=65, 7x6)
+            drawSprite(SPRITES.marioPipeS, 7, 4, wx(45), 4);
+            drawSprite(goombaS, 5, 4, wx(58 - patrolOffset), 4);
+            drawSprite(SPRITES.marioPipeT, 7, 6, wx(65), 2);
+
+            // [區塊 5] 深淵坑洞 (x=76..79) 後方的跳躍無敵星星 (x=83, 5x5 閃爍跳動)
+            const starS = (Math.floor(nowMs / 100) % 2 === 0) ? SPRITES.marioStar1 : SPRITES.marioStar2;
+            const starY = (Math.floor(nowMs / 160) % 2 === 0) ? 1 : 2;
+            drawSprite(starS, 5, 5, wx(83), starY);
+
+            // [區塊 6] 終點大階梯金字塔 (x=92..98，高度由 1 格遞增至 6 格，最後 2 行寬頂台)
+            for (let stepCol = 0; stepCol < 7; stepCol++) {
+              const stepH = Math.min(6, stepCol + 1);
+              for (let r = 8 - stepH; r <= 7; r++) {
+                setPixel(wx(92 + stepCol), r);
+              }
+            }
+
+            // [區塊 7] 終點旗桿與迎風飄揚三角旗 (x=106，底部基座 + 旗桿 y=0..7 + 飄動旗幟)
+            const poleX = wx(106);
+            setPixel(poleX - 1, 7); setPixel(poleX, 7); setPixel(poleX + 1, 7); // 旗桿底座
+            for (let r = 0; r <= 6; r++) setPixel(poleX, r); // 旗桿直線
+            // 旗桿左側向左飄動的三角旗 (y=1..3，隨時間微幅擺動旗尖)
+            setPixel(poleX - 1, 1); setPixel(poleX - 2, 1);
+            setPixel(poleX - 1, 2); setPixel(poleX - 2, 2); setPixel(poleX - 3, (Math.floor(nowMs / 200) % 2 === 0) ? 2 : 1);
+            setPixel(poleX - 1, 3);
+
+            // [區塊 8] 終點城堡 (7x8，x=114，垛口城牆 + 雙窗 + 拱門)
+            drawSprite(SPRITES.marioCastle, 7, 8, wx(114), 0);
+          } else {
+            // 按鍵解除鬧鐘：切換至【World 1-1 終點拉旗過關 & 城堡煙火慶祝】！
+            for (let sx = 0; sx < COLS; sx++) setPixel(sx, 8);
+
+            // 左側：終點階梯金字塔 (x=2..8)
+            for (let stepCol = 0; stepCol < 7; stepCol++) {
+              const stepH = Math.min(6, stepCol + 1);
+              for (let r = 8 - stepH; r <= 7; r++) {
+                setPixel(2 + stepCol, r);
+              }
+            }
+
+            // 中央：終點旗桿 (x=16)，旗幟由頂部 (y=1) 順著旗桿一路滑降到底部 (y=5)！
+            const poleX = 16;
+            setPixel(poleX - 1, 7); setPixel(poleX, 7); setPixel(poleX + 1, 7);
+            for (let r = 0; r <= 6; r++) setPixel(poleX, r);
+            const flagDrop = Math.min(4, Math.floor(elapsedMs / 180)); // 0 -> 4 滑落
+            const fy = 1 + flagDrop;
+            setPixel(poleX - 1, fy);     setPixel(poleX - 2, fy);
+            setPixel(poleX - 1, fy + 1); setPixel(poleX - 2, fy + 1); setPixel(poleX - 3, fy + 1);
+
+            // 右側：終點城堡 (x=28, y=0..7)，當旗子降到底後，城堡屋頂升起勝利小旗並綻放 3 響慶祝煙火！
+            drawSprite(SPRITES.marioCastle, 7, 8, 28, 0);
+            if (elapsedMs > 700) {
+              // 城堡頂端升起過關小旗 (x=31, y=0)
+              setPixel(31, 0); setPixel(32, 0);
+              // 天空依序綻放十字星火 (x=22, 37, 25)
+              const fwPhase = Math.floor((elapsedMs - 700) / 250);
+              const fwCoords = [[22, 2], [38, 2], [24, 1]];
+              const [fx, fcy] = fwCoords[fwPhase % 3];
+              if (Math.floor(elapsedMs / 80) % 2 === 0) {
+                setPixel(fx, fcy);
+                setPixel(fx - 1, fcy); setPixel(fx + 1, fcy);
+                setPixel(fx, fcy - 1); setPixel(fx, fcy + 1);
+              } else {
+                setPixel(fx - 1, fcy - 1); setPixel(fx + 1, fcy - 1);
+                setPixel(fx - 1, fcy + 1); setPixel(fx + 1, fcy + 1);
+              }
+            }
+          }
+        }
+
+        // 4. 太空侵略者 (左側雷射戰機 x=1 上下巡航發射子彈 + 1 號原版螃蟹怪 11x8 與 3 號原版烏賊怪 8x8 編隊進逼、中彈爆裂與復活循環)
+        else if (activeAlarmTheme === 'invaders') {
+          // 所有週期皆整除每回合 5400ms (約 337.5ms / 225ms 一拍)，整輪畫面可無縫循環 (韌體寫死成固定動畫)
+          const frameAlt = (Math.floor(elapsedMs * 16 / 5400) % 2 === 0);
+          const crabS = frameAlt ? SPRITES.crab1 : SPRITES.crab2;
+          const squidS = frameAlt ? SPRITES.squid1 : SPRITES.squid2;
+
+          if (!alarmDismissed) {
+            // 每回合 5400ms (90 ticks, 60ms/tick)：完成「怪獸進逼 -> 第一發擊爆螃蟹怪 -> 第二發擊爆烏賊怪 -> 編隊重生」完整戰鬥戲碼
+            const tick = Math.floor(elapsedMs / 60) % 90;
+
+            // 外星編隊往復進逼位移 (0 -> 4 -> 0)
+            const wavePhase = Math.floor(elapsedMs * 16 / 5400) % 8;
+            const marchOffset = (wavePhase <= 4) ? wavePhase : (8 - wavePhase);
+            const crabX = 16 - marchOffset;   // 1 號：11x8 招牌螃蟹怪 (前排)
+            const squidX = 31 - marchOffset;  // 3 號：8x8 尖頭烏賊怪 (後排)
+
+            // 戰機位於 x=1，在 y=0..2 之間持續平滑上下巡航移動 (0 -> 1 -> 2 -> 1 循環)
+            const fighterCycle = [1, 0, 1, 2];
+            const fighterY = fighterCycle[Math.floor(elapsedMs * 24 / 5400) % 4];
+            const gunY = fighterY + 3; // 戰機高 7px (奇數)，正中心砲管永遠在 fighterY + 3
+            drawSprite(SPRITES.invFighter, 6, 7, 1, fighterY);
+
+            // --- 第一發雷射子彈 (tick 4..15)：從戰機砲管射向前排 1 號螃蟹怪 ---
+            if (tick >= 4 && tick < 15) {
+              const bx = 7 + (tick - 4) * 1.1;
+              setPixel(Math.floor(bx), 4);
+              setPixel(Math.floor(bx) + 1, 4); // 2px 高速光彈
+            }
+            // 1 號螃蟹怪狀態：tick < 15 存活擺動；tick 15..22 中彈顯示街機放射狀爆炸火花；tick >= 76 重新進場
+            if (tick < 15 || tick >= 76) {
+              drawSprite(crabS, 11, 8, crabX, 0);
+            } else if (tick >= 15 && tick <= 22) {
+              if (tick % 2 === 1) {
+                drawSprite(SPRITES.invExplode, 8, 8, crabX + 1, 0);
+              }
+            }
+
+            // --- 第二發雷射子彈 (tick 36..56)：穿過前排空隙，直擊後排 3 號烏賊怪 ---
+            if (tick >= 36 && tick < 56) {
+              const bx2 = 7 + (tick - 36) * 1.2;
+              setPixel(Math.floor(bx2), 4);
+              setPixel(Math.floor(bx2) + 1, 4);
+            }
+            // 3 號烏賊怪狀態：tick < 56 存活擺動；tick 56..63 中彈爆裂；tick >= 72 重新進場
+            if (tick < 56 || tick >= 72) {
+              drawSprite(squidS, 8, 8, squidX, 0);
+            } else if (tick >= 56 && tick <= 63) {
+              if (tick % 2 === 0) {
+                drawSprite(SPRITES.invExplode, 8, 8, squidX, 0);
+              }
+            }
+          } else {
+            // 按鍵解除鬧鐘：戰機定格於 (x=1, y=1)，正中心砲管位於 y=4 (螢幕與戰機共同正中心)！
+            // 發射奇數高度 (1px 核心 + 上下對稱 3px 擴散 = y=3,4,5) 的置中貫穿波動砲！
+            drawSprite(SPRITES.invFighter, 6, 7, 1, 1);
+            drawLine(7, 4, 41, 4); // 正中心主光束 (y=4 恆亮)
+            if (Math.floor(elapsedMs / 60) % 2 === 0) {
+              drawLine(7, 3, 41, 3); // 上側對稱光束 (y=3)
+              drawLine(7, 5, 41, 5); // 下側對稱光束 (y=5)，共 3px 奇數粗度完美對齊砲管中心！
+            }
+            // 兩隻怪獸劇烈閃爍爆炸後灰飛煙滅
+            if (elapsedMs < 1200 && (Math.floor(elapsedMs / 90) % 2 === 0)) {
+              drawSprite(SPRITES.invExplode, 8, 8, 15, 0);
+              drawSprite(SPRITES.invExplode, 8, 8, 30, 0);
+            }
+          }
+        }
+
+        // 5. 寶可夢 Game Boy (隨機 4 種經典遇敵切場特效 -> 7x7 精緻精靈球 + 上方短 L 型血條 + PIKA/LV99 + 巨型閃電)
+        else if (activeAlarmTheme === 'pokemon') {
+          if (!alarmDismissed) {
+            // 每回合 5640ms (94 ticks, 60ms/tick)
+            const cycleIdx = Math.floor(elapsedMs / (94 * 60));
+            if (cycleIdx !== lastPokeCycle) {
+              lastPokeCycle = cycleIdx;
+              pokeIntroStyle = pokeForcedStyle !== null ? pokeForcedStyle : Math.floor(Math.random() * 4); // 每輪重新隨機抽取 4 種遇敵轉場！
+            }
+            const tick = Math.floor(elapsedMs / 60) % 94;
+
+            // --- 階段 1A (tick 0..5)：野生遇敵瞬間全螢幕黑白快閃 3 次 ---
+            if (tick < 6) {
+              if (tick % 2 === 0) {
+                for (let y = 0; y < ROWS; y++) drawLine(0, y, 41, y);
+              }
+            }
+            // --- 階段 1B (tick 6..15)：4 種隨機 Game Boy 經典遇敵幾何切場特效 (共 10 ticks = 600ms) ---
+            else if (tick < 16) {
+              const p = (tick - 6) / 9; // 進度 0.0 -> 1.0
+
+              // 特效 0：【雙向水平百葉窗拉幕】(偶數行由左向右、奇數行由右向左交錯填滿)
+              if (pokeIntroStyle === 0) {
+                const wipeLen = Math.round(p * 41);
+                for (let y = 0; y < ROWS; y++) {
+                  if (y % 2 === 0) drawLine(0, y, wipeLen, y);
+                  else drawLine(41 - wipeLen, y, 41, y);
+                }
+              }
+              // 特效 1：【順時針扇形雷達掃一圈】(從 12 點鐘方向順時針掃滿 360 度)
+              else if (pokeIntroStyle === 1) {
+                const maxAngle = p * Math.PI * 2;
+                for (let y = 0; y < ROWS; y++) {
+                  for (let x = 0; x < COLS; x++) {
+                    // 以螢幕中心 (20.5, 4.0) 計算順時針極座標角度 (0 ~ 2π)
+                    let ang = Math.atan2(x - 20.5, -(y - 4.0));
+                    if (ang < 0) ang += Math.PI * 2;
+                    if (ang <= maxAngle) setPixel(x, y);
+                  }
+                }
+              }
+              // 特效 2：【外框向內幾何方框漩渦填滿】(Game Boy 經典四周邊框一圈圈向中心收縮填滿)
+              else if (pokeIntroStyle === 2) {
+                for (let y = 0; y < ROWS; y++) {
+                  for (let x = 0; x < COLS; x++) {
+                    // 正規化離邊界的最小距離 (0.0 為最外框，1.0 為正中心)
+                    const distEdge = Math.min(x / 20.5, (41 - x) / 20.5, y / 4.0, (8 - y) / 4.0);
+                    if (distEdge <= p * 1.05) setPixel(x, y);
+                  }
+                }
+              }
+              // 特效 3：【不等大幾何三角形依序填滿角落與畫面】(共邊無縫三角剖分：1.右上角 -> 2.右下角 -> 3.左下角 -> 4.左上角 -> 5~6.中央斜切，100% 嚴密填滿無破洞！)
+              else {
+                // 嚴格判斷點 (px, py) 是否在三角形 (x1,y1)-(x2,y2)-(x3,y3) 內
+                const inTri = (px, py, x1, y1, x2, y2, x3, y3) => {
+                  const d1 = (px - x2) * (y1 - y2) - (x1 - x2) * (py - y2);
+                  const d2 = (px - x3) * (y2 - y3) - (x2 - x3) * (py - y3);
+                  const d3 = (px - x1) * (y3 - y1) - (x3 - x1) * (py - y1);
+                  const hasNeg = (d1 < 0) || (d2 < 0) || (d3 < 0);
+                  const hasPos = (d1 > 0) || (d2 > 0) || (d3 > 0);
+                  return !(hasNeg && hasPos);
+                };
+                // 將 42x9 矩形嚴密三角剖分 (Exact Triangulation) 為 6 塊共邊、不等大的幾何三角形：
+                // 依序填滿：1.右上角 -> 2.右下角 -> 3.左下角 -> 4.左上角 -> 5.中右斜塊 -> 6.中左斜塊 (第 6 步 100% 無縫填滿全畫面)
+                const tris = [
+                  [17, 0,  41, 0,  41, 5], // 1) 右上角三角形 (寬 24 x 高 5)
+                  [24, 8,  41, 5,  41, 8], // 2) 右下角三角形 (寬 17 x 高 3，與第1塊共點 (41,5))
+                  [0,  3,  24, 8,  0,  8], // 3) 左下角大三角形 (寬 24 x 高 5，與第2塊共點 (24,8))
+                  [0,  0,  17, 0,  0,  3], // 4) 左上角三角形 (寬 17 x 高 3，與第1塊共點 (17,0)、與第3塊共點 (0,3))
+                  [17, 0,  41, 5,  24, 8], // 5) 中央偏右斜切大三角形 (完美銜接 1、2 塊斜邊)
+                  [0,  3,  17, 0,  24, 8]  // 6) 中央偏左斜切大三角形 (完美銜接 3、4、5 塊斜邊，100% 填滿整個 42x9 矩形！)
+                ];
+                const numSteps = Math.min(6, Math.floor(p * 6) + 1);
+                for (let y = 0; y < ROWS; y++) {
+                  for (let x = 0; x < COLS; x++) {
+                    for (let k = 0; k < numSteps; k++) {
+                      const t = tris[k];
+                      if (inTri(x, y, t[0], t[1], t[2], t[3], t[4], t[5])) {
+                        setPixel(x, y);
+                        break;
+                      }
+                    }
+                  }
+                }
+              }
+            }
+            // --- 階段 2 (tick 16..93)：7x7 精緻精靈球 + 上方短 L 型血條與下方 PIKA/LV99 字幕 + 巨型閃電 ---
+            else {
+              // 1) 左側：7x7 精緻奇數精靈球 (x=2, y=1..7)，上下各留 1px 空間，呈現上紅實心、中央挖空橫帶與圓鈕、下白空心弧底
+              const subTick = (tick - 16) % 26;
+              let ballS = SPRITES.pokeBall7M;
+              if (subTick >= 4 && subTick <= 7) ballS = SPRITES.pokeBall7L;
+              else if (subTick >= 12 && subTick <= 15) ballS = SPRITES.pokeBall7R;
+              drawSprite(ballS, 7, 7, 2, 1);
+
+              // 2) 中央上方：短 L 型血條位於上方 (y=0..1)：左端垂直立柱僅高出 1 格 (x=12, y=0..1) + 水平血條延伸 (x=12..31, y=1)
+              // 血條自 tick 34 開始扣血，扣完後維持殘血 (6px)，不再補滿！
+              setPixel(12, 0); // 左端 L 短立柱 (高出 1 格)
+              const hpLen = (tick < 34) ? 19 : Math.max(6, 19 - Math.floor((tick - 34) * 0.65));
+              drawLine(12, 1, 12 + hpLen, 1);
+
+              // 3) 中央下方 (y=3..7)：交替顯示【PIKA】與【LV 99】
+              const showLv = (tick >= 56);
+              if (!showLv) {
+                // 繪製清晰 4x5 "PIKA" (x=13..31, y=3..7)
+                drawSprite(SPRITES.pokeCharP, 4, 5, 13, 3);
+                drawSprite(SPRITES.pokeCharI, 4, 5, 18, 3);
+                drawSprite(SPRITES.pokeCharK, 4, 5, 23, 3);
+                drawSprite(SPRITES.pokeCharA, 4, 5, 28, 3);
+              } else {
+                // 繪製清晰 "LV 99" (L: x=13, V: x=18, 9: x=24, 9: x=28, y=3..7)
+                drawSprite(SPRITES.pokeCharL, 4, 5, 13, 3);
+                drawSprite(SPRITES.pokeCharV, 4, 5, 18, 3);
+                drawDigit(9, 24, 3);
+                drawDigit(9, 28, 3);
+              }
+
+              // 4) 右側：7x8 巨型閃電圖騰 (x=34, y=0..7)，代表皮卡丘十萬伏特，帶放電閃爍動態！
+              if (tick % 6 !== 0) {
+                drawSprite(SPRITES.pokeBoltBig, 7, 8, 34, 0);
+              }
+            }
+          } else {
+            // 按鍵解除鬧鐘：【GOTCHA! 收服成功！】
+            // 左側 7x7 精緻精靈球定格鎖定 + 球旁冒出收服星芒 + 右側跑出清晰「GOTCHA」字樣！
+            drawSprite(SPRITES.pokeBall7M, 7, 7, 2, 1);
+            // 精靈球右上角閃爍收服成功十字星芒 (x=10, y=1)
+            if (Math.floor(elapsedMs / 120) % 2 === 0) {
+              setPixel(10, 0); setPixel(9, 1); setPixel(11, 1); setPixel(10, 2);
+            }
+            // 右側顯示清晰 "GOTCHA!" (T 採用 3px 奇數對稱寬度，消除 T 與 C 之間的多餘空隙，並在尾端補上 "!" 驚嘆號)
+            drawSprite(SPRITES.pokeCharG, 4, 5, 13, 2); // x=13..16
+            drawSprite(SPRITES.pokeCharO, 4, 5, 18, 2); // x=18..21
+            drawSprite([0x07, 0x02, 0x02, 0x02, 0x02], 3, 5, 23, 2); // T (3x5, x=23..25，不再多空 1 格！)
+            drawSprite(SPRITES.pokeCharC, 4, 5, 27, 2); // x=27..30
+            drawSprite(SPRITES.pokeCharH, 4, 5, 32, 2); // x=32..35
+            drawSprite(SPRITES.pokeCharA, 4, 5, 37, 2); // x=37..40
+          }
+        }
+
+        // 6. 街機 Continue (開場出現小特效 -> "CONTINUE?" + 右側 7x9 超大粗體倒數 9..8..7..0 -> "GAME OVER" 逐字砸落 -> 全文字往下墜落消失 -> 停頓黑畫面 -> 重新循環)
+        else if (activeAlarmTheme === 'continue') {
+          if (!alarmDismissed) {
+            // 每輪總時長 14600ms (14.6 秒)：
+            // - 0 .. 10000ms (10秒)：開場掃描展開小特效 (前 450ms) + CONTINUE? 倒數 9 -> 0
+            // - 10000 .. 12500ms (2.5秒)：GAME OVER 快閃 + 由上往下逐字砸落 + 警戒線閃爍
+            // - 12500 .. 13500ms (1.0秒)：GAME OVER 全部文字一起往下滑落沉沒消失 (y 由 2 掉到 10)
+            // - 13500 .. 14600ms (1.1秒)：全黑停頓留白，隨後無縫接回下一輪 CONTINUE? 出現小特效！
+            const cycleMs = elapsedMs % 14600;
+
+            if (cycleMs < 10000) {
+              const secPhase = Math.floor(cycleMs / 1000);
+              const count = 9 - secPhase; // 9 -> 8 -> ... -> 0
+
+              // 階段 1 (0 .. 180ms)：由左至右射出正中央直線光束 (y=4)
+              if (cycleMs < 180) {
+                const beamW = Math.min(41, Math.floor((cycleMs / 180) * 41));
+                drawLine(0, 4, beamW, 4);
+              } else {
+                // 階段 2 (180 .. 500ms)：文字與倒數數字從正中間的光束 (y=4) 同步向「上下對稱展開」顯現！
+                // 倒數最後 3 秒 (3, 2, 1) 時加入街機經典催促快閃感
+                const urgentBlink = (count <= 3 && count > 0) ? (Math.floor(nowMs / 120) % 2 === 0) : true;
+
+                // 1) 左側完整顯示單字 "CONTINUE?" (x=0..33, y=2..6)
+                drawSprite(SPRITES.arcCharC, 3, 5, 0,  2); // C (x=0..2)
+                drawSprite(SPRITES.arcCharO, 3, 5, 4,  2); // O (x=4..6)
+                drawSprite(SPRITES.pokeCharN, 4, 5, 8, 2); // N (4x5, x=8..11)
+                drawSprite(SPRITES.arcCharT, 3, 5, 13, 2); // T (x=13..15)
+                drawLine(17, 2, 17, 6);                    // I (1x5 俐落直柱, x=17)
+                drawSprite(SPRITES.pokeCharN, 4, 5, 19, 2);// N (4x5, x=19..22)
+                drawSprite(SPRITES.arcCharU, 3, 5, 24, 2); // U (x=24..26)
+                drawSprite(SPRITES.arcCharE, 3, 5, 28, 2); // E (x=28..30)
+
+                // 閃爍問號 "?" (x=32..33, y=2..6)
+                if (cycleMs < 600 || Math.floor(nowMs / 250) % 2 === 0) {
+                  setPixel(32, 2); setPixel(33, 2);
+                  setPixel(33, 3); setPixel(32, 4);
+                  setPixel(32, 6);
+                }
+
+                // 2) 右側：7x9 滿版超大雙線粗體倒數數字 (x=35..41, y=0..8)
+                if (urgentBlink) {
+                  drawKortlinjeDigit(count, count === 1 ? 36 : 35, 0);
+                }
+
+                // CRT 垂直展開遮罩 (180 .. 500ms)：以正中央 y=4 為軸心，一格一格向「上下對稱拉開」！
+                if (cycleMs < 500) {
+                  // halfSpan 由 0 -> 1 -> 2 -> 3 -> 4 (每 80ms 上下各多展開 1 格)
+                  const halfSpan = Math.floor((cycleMs - 180) / 80);
+                  for (let y = 0; y < ROWS; y++) {
+                    if (Math.abs(y - 4) > halfSpan) {
+                      for (let x = 0; x < COLS; x++) setPixel(x, y, 0); // 遮蔽尚未展開的外圍列
+                    }
+                  }
+                }
+              }
+            } else if (cycleMs < 13500) {
+              // --- 10000 .. 13500ms：倒數歸零未投幣 -> 【GAME OVER】逐字砸落 + 最後全文字往下墜落消失！ ---
+              const goElapsed = cycleMs - 10000; // 0 .. 3499ms
+
+              // 特效前 260ms：螢幕崩潰快閃 2 次
+              if (goElapsed < 260 && (Math.floor(goElapsed / 65) % 2 === 0)) {
+                for (let y = 0; y < ROWS; y++) drawLine(0, y, 41, y);
+              } else if (goElapsed >= 260) {
+                // 當 goElapsed >= 2500ms 時，全部文字一起往下滑落沉沒消失 (每 85ms 往下掉 1 格，直到完全掉出 y=8 底部)
+                const sinkOffset = (goElapsed >= 2500) ? Math.floor((goElapsed - 2500) / 85) : 0;
+
+                // 進場時字母由天而降 (Drop-in)，退場時全體往下沉沒 (+sinkOffset)
+                const charY = (idx) => {
+                  const charStart = 260 + idx * 55;
+                  if (goElapsed < charStart) return -7; // 尚未落下
+                  if (goElapsed < charStart + 110) return -1; // 半空中
+                  return 2 + sinkOffset; // 砸落就位 (y=2)，並在最後階段往下掉出畫面！
+                };
+
+                // 繪製居中滿版 "GAME OVER" (x=1..40)：
+                // "GAME" (x=1..19)：G(4) + A(4) + M(5) + E(3)
+                drawSprite(SPRITES.pokeCharG, 4, 5, 1,  charY(0)); // G (x=1..4)
+                drawSprite(SPRITES.pokeCharA, 4, 5, 6,  charY(1)); // A (x=6..9)
+                drawSprite(SPRITES.pokeCharM, 5, 5, 11, charY(2)); // M (x=11..15)
+                drawSprite(SPRITES.arcCharE,  3, 5, 17, charY(3)); // E (x=17..19)
+
+                // "OVER" (x=23..40)：O(4) + V(4) + E(3) + R(4)
+                drawSprite(SPRITES.pokeCharO, 4, 5, 23, charY(4)); // O (x=23..26)
+                drawSprite(SPRITES.pokeCharV, 4, 5, 28, charY(5)); // V (x=28..31)
+                drawSprite(SPRITES.arcCharE,  3, 5, 33, charY(6)); // E (x=33..35)
+                drawSprite(SPRITES.pokeCharR, 4, 5, 37, charY(7)); // R (x=37..40)
+
+                // 當全部字母定格在中央期間 (850ms .. 2500ms)，上下邊框 (y=0, y=8) 閃爍街機警戒線
+                if (goElapsed > 850 && goElapsed < 2500 && (Math.floor(nowMs / 180) % 2 === 0)) {
+                  drawLine(1, 0, 40, 0);
+                  drawLine(1, 8, 40, 8);
+                }
+              }
+            }
+            // --- 13500 .. 14600ms (1.1秒)：全部文字已往下掉光，保持全黑停頓留白，準備迎接下一輪開場光束展開！ ---
+          } else {
+            // 按鍵解除鬧鐘：【投幣接關成功！代幣咚一聲掉入投幣孔 -> CREDIT 1 / GO!】
+            const dropPhase = Math.floor(elapsedMs / 80);
+
+            if (dropPhase < 8) {
+              // 階段 A (前 640ms)：代幣由上方掉入中央投幣孔 (Slot) 的動態特寫！
+              // 繪製投幣孔底座外框 (x=15..25, y=7..8)
+              drawLine(15, 7, 17, 7); drawLine(23, 7, 25, 7);
+              drawLine(15, 8, 25, 8);
+              // 5x5 代幣由 y=-2 垂直落入 y=5 投幣槽口
+              const coinY = -2 + dropPhase;
+              drawSprite(SPRITES.arcCoin1, 5, 5, 18, coinY);
+            } else {
+              // 階段 B (640ms 後)：投幣完成！左側顯示靜止代幣 + 中央顯示 "GO!" 搭配右側滿版數字 "1" (代表 1P / 1 CREDIT 復活開戰！)
+              drawSprite(SPRITES.arcCoin1, 5, 5, 2, 2);
+              // 閃爍星芒
+              if (Math.floor(elapsedMs / 100) % 2 === 0) {
+                setPixel(9, 1); setPixel(8, 2); setPixel(10, 2); setPixel(9, 3);
+              }
+              // 顯示清晰大字 "GO!" (G: x=13..16, O: x=18..21, !: x=24)
+              drawSprite(SPRITES.pokeCharG, 4, 5, 13, 2);
+              drawSprite(SPRITES.pokeCharO, 4, 5, 18, 2);
+              setPixel(24, 2); setPixel(24, 3); setPixel(24, 4); setPixel(24, 6); // "!"
+              // 右側顯示 6x9 雙線粗體 "01" (代表 CREDIT 01 已投幣！)
+              drawSprite(KORTLINJE_BOLD_6x9[0], 6, 9, 28, 0);
+              drawSprite(KORTLINJE_BOLD_6x9[1], 6, 9, 35, 0);
+            }
+          }
+        }
+
+        // 7. Windows 藍屏重啟 (BSOD：視窗當機殘影崩潰 -> 左側經典大哭臉 :( + ERROR / FATAL 閃爍 + 底部分段式方塊進度條)
+        else if (activeAlarmTheme === 'bsod') {
+          if (!alarmDismissed) {
+            // 每輪完整當機重啟循環為 6400ms (6.4 秒)
+            const cycleMs = elapsedMs % 6400;
+
+            if (cycleMs < 480) {
+              // 階段 1 (0 .. 480ms)：Windows 95 經典「當機視窗殘影崩潰 (Window Cascade Glitch)」+ 閃屏
+              const numWins = Math.min(4, Math.floor(cycleMs / 95) + 1);
+              for (let i = 0; i < numWins; i++) {
+                const wx = 1 + i * 8;
+                const wy = i;
+                const ww = 16;
+                const wh = Math.min(6, 9 - wy);
+                // 先挖空視窗內部以製造「後彈出的錯誤視窗壓過前一個視窗」的層疊殘影感
+                for (let py = wy; py < wy + wh; py++) {
+                  for (let px = wx; px < wx + ww; px++) {
+                    setPixel(px, py, 0);
+                  }
+                }
+                // 繪製彈窗外框與頂部粗體標題列 (Title Bar)
+                drawLine(wx, wy, wx + ww - 1, wy);
+                drawLine(wx, wy + 1, wx + ww - 1, wy + 1); // 2px 實心標題列
+                drawLine(wx, wy + wh - 1, wx + ww - 1, wy + wh - 1);
+                drawLine(wx, wy, wx, wy + wh - 1);
+                drawLine(wx + ww - 1, wy, wx + ww - 1, wy + wh - 1);
+                // 標題列右上角挖空一顆關閉鈕 [x]
+                setPixel(wx + ww - 2, wy, 0);
+              }
+              // 400..480ms 瞬間全白閃光切入藍屏！
+              if (cycleMs >= 400) {
+                for (let y = 0; y < ROWS; y++) {
+                  for (let x = 0; x < COLS; x++) setPixel(x, y);
+                }
+              }
+            } else if (cycleMs < 6000) {
+              // 階段 2 (480 .. 6000ms)：經典 Windows 藍屏主畫面 (左側 7x7 大哭臉 :( + 右上 ERROR/FATAL + 右下分段式方塊進度條)
+              const bsodElapsed = cycleMs - 480; // 0 .. 5519ms
+
+              // 1) 左側：7x7 經典 Windows 藍屏側向大哭臉 `:(` (x=1..7, y=1..7)
+              drawSprite(SPRITES.bsodSad, 7, 7, 1, 1);
+
+              // 2) 右上半部 (x=11..39, y=0..4)：與下方進度條 (x=11..39) 左右邊緣 100% 完美垂直對齊！
+              // 每 1.4 秒交替顯示 "ERROR !" 與 "FATAL !" 警告字樣
+              const wordPhase = Math.floor(bsodElapsed / 1400) % 2;
+              if (wordPhase === 0) {
+                // 顯示 "ERROR !" (x=11..39, y=0..4，左起 x=11 對齊 `[`，右迄 x=39 對齊 `]`)
+                drawSprite(SPRITES.arcCharE,  3, 5, 11, 0); // E (x=11..13)
+                drawSprite(SPRITES.pokeCharR, 4, 5, 15, 0); // R (x=15..18)
+                drawSprite(SPRITES.pokeCharR, 4, 5, 20, 0); // R (x=20..23)
+                drawSprite(SPRITES.pokeCharO, 4, 5, 25, 0); // O (x=25..28)
+                drawSprite(SPRITES.pokeCharR, 4, 5, 30, 0); // R (x=30..33)
+                // 閃爍雙線加粗驚嘆號 "!" (x=38..39，右緣貼齊 x=39)
+                if (Math.floor(nowMs / 220) % 2 === 0) {
+                  drawLine(38, 0, 38, 2); setPixel(38, 4);
+                  drawLine(39, 0, 39, 2); setPixel(39, 4);
+                }
+              } else {
+                // 顯示 "FATAL !" (x=11..39, y=0..4，左起 x=11 對齊 `[`，右迄 x=39 對齊 `]`)
+                drawSprite(SPRITES.arcCharF,  3, 5, 11, 0); // F (x=11..13)
+                drawSprite(SPRITES.pokeCharA, 4, 5, 15, 0); // A (x=15..18)
+                drawSprite(SPRITES.arcCharT,  3, 5, 20, 0); // T (x=20..22)
+                drawSprite(SPRITES.pokeCharA, 4, 5, 24, 0); // A (x=24..27)
+                drawSprite(SPRITES.pokeCharL, 4, 5, 29, 0); // L (x=29..32)
+                // 閃爍雙線加粗驚嘆號 "!" (x=38..39，右緣貼齊 x=39)
+                if (Math.floor(nowMs / 150) % 2 === 0) {
+                  drawLine(38, 0, 38, 2); setPixel(38, 4);
+                  drawLine(39, 0, 39, 2); setPixel(39, 4);
+                }
+              }
+
+              // 3) 右下半部 (x=11..39, y=6..8)：100% 數學整除的 Windows「2x3 分段式方塊進度條」
+              // 算式：左括號 `[` (x=11..12) + 1px 間距 (x=13) + 8 顆 2x3 方塊 (x=14..36，含 7 個 1px 間隔) + 1px 間距 (x=37) + 右括號 `]` (x=38..39) = 總寬 29px，左右完全對稱整除！
+              drawLine(11, 6, 11, 8); setPixel(12, 6); setPixel(12, 8); // 左括號 `[` (x=11..12)
+              drawLine(39, 6, 39, 8); setPixel(38, 6); setPixel(38, 8); // 右括號 `]` (x=38..39)
+
+              // 內部共 8 顆完整的 2x3 實心方塊 (位於 y=6..8：x = 14..15, 17..18, 20..21, 23..24, 26..27, 29..30, 32..33, 35..36)
+              // 前 4500ms 由 0 顆推進至 8 顆滿格；最後 1000ms (4500..5520ms) 卡在滿格並快閃！
+              const blocksFilled = Math.min(8, Math.floor(bsodElapsed / 500));
+              const barBlinkOn = (bsodElapsed < 4500) || (Math.floor(nowMs / 120) % 2 === 0);
+              if (barBlinkOn) {
+                for (let b = 0; b < blocksFilled; b++) {
+                  const bx = 14 + b * 3;
+                  for (let dy = 6; dy <= 8; dy++) {
+                    setPixel(bx, dy);
+                    setPixel(bx + 1, dy);
+                  }
+                }
+              }
+            } else {
+              // 階段 3 (6000 .. 6400ms)：重啟斷電黑屏 0.4 秒，準備進入下一輪當機循環
+            }
+          } else {
+            // 按鍵解除鬧鐘：【沙漏漏沙重啟 -> 哭臉變大笑臉 :) + 顯示 "OK!" 與打勾！】
+            if (elapsedMs < 750) {
+              // 階段 A (前 750ms)：螢幕正中央顯示經典 Windows 沙漏 (Hourglass) 漏沙動畫
+              const hFrame = Math.min(2, Math.floor(elapsedMs / 250));
+              const hSprites = [SPRITES.bsodHour1, SPRITES.bsodHour2, SPRITES.bsodHour3];
+              drawSprite(hSprites[hFrame], 5, 7, 18, 1);
+            } else {
+              // 階段 B (750ms 後)：重啟完成！左側大哭臉變「大笑臉 :)」，中央顯示 "OK!"，右側顯示大勾勾！
+              drawSprite(SPRITES.bsodHappy, 7, 7, 1, 1); // 7x7 大笑臉 :) (x=1..7, y=1..7)
+
+              // 中央顯示清晰 "OK!" (x=13..24, y=2..6)
+              drawSprite(SPRITES.pokeCharO, 4, 5, 13, 2); // O (x=13..16)
+              drawSprite(SPRITES.pokeCharK, 4, 5, 18, 2); // K (x=18..21)
+              setPixel(24, 2); setPixel(24, 3); setPixel(24, 4); setPixel(24, 6); // "!"
+
+              // 右側顯示雙線加粗大勾勾 Checkmark (x=29..38, y=1..7)
+              drawLine(29, 4, 32, 7);
+              drawLine(30, 4, 32, 6);
+              drawLine(32, 7, 38, 1);
+              drawLine(32, 6, 37, 1);
+            }
+          }
+        }
+
+        // 8. 俄羅斯方塊 (Tetris Panic：2x2 厚實方塊井道 + 逐塊真實落入堆出 4 格黃金缺口 -> 長條方塊最後一刻手殘轉成直立封死洞口！)
+        else if (activeAlarmTheme === 'tetris') {
+          // 定義 2x2 方塊單元繪製函式：col (0..19) 對應 x = 2 + col*2，row (0..3) 對應 y = 1 + row*2
+          const drawMino = (col, row) => {
+            if (col < 0 || col > 19 || row < 0 || row > 3) return;
+            const px = 2 + col * 2;
+            const py = 1 + row * 2;
+            setPixel(px,     py);     setPixel(px + 1, py);
+            setPixel(px,     py + 1); setPixel(px + 1, py + 1);
+          };
+
+          // 繪製左側井底厚實底座牆 (x=0..1, y=0..8) 與 頂部 y=0 井道虛線邊框
+          drawLine(0, 0, 0, 8);
+          drawLine(1, 0, 1, 8);
+          for (let x = 2; x < COLS; x += 2) setPixel(x, 0);
+
+          // 繪製「初始左側基底」：已填滿 col=0..1 的 row=1..3，以及 col=2..3 的最底層 row=3 (共 8 顆 mino，不預畫任何懸空階梯！)
+          const drawInitialBase = () => {
+            for (let c = 0; c <= 1; c++) {
+              for (let r = 1; r <= 3; r++) drawMino(c, r);
+            }
+            drawMino(2, 3); drawMino(3, 3);
+          };
+
+          // 繪製「O 方塊就位後的完整前 4 排底座」：col=0..3 的 row=1..3 全滿 (12 顆 mino)，唯獨上方 row=0 (col=0..3) 留出完美的 4 格長條黃金缺口！
+          const drawReadyStack = () => {
+            for (let c = 0; c <= 3; c++) {
+              for (let r = 1; r <= 3; r++) drawMino(c, r);
+            }
+          };
+
+          if (!alarmDismissed) {
+            // 每輪重新隨機生成一套「真實碰撞模擬」的混亂堆疊劇本 (方塊種類、旋轉、行位每輪都不同)
+            if (!tetrisPlan || (nowMs - tetrisCycleStartMs) >= tetrisPlan.total) {
+              if (tetrisForcedPlan !== null) tetrisPlanIdx = tetrisForcedPlan;
+              else {
+                let next;
+                do { next = Math.floor(Math.random() * TETRIS_PLANS.length); } while (TETRIS_PLANS.length > 1 && next === tetrisPlanIdx);
+                tetrisPlanIdx = next;
+              }
+              tetrisPlan = TETRIS_PLANS[tetrisPlanIdx];
+              tetrisCycleStartMs = nowMs;
+            }
+            const plan = tetrisPlan;
+            const cycleMs = nowMs - tetrisCycleStartMs;
+
+            // 以像素位移繪製單顆 2x2 mino (支援整體往下滑落 offsetY，setPixel 自動裁切邊界)
+            const drawMinoAt = (col, row, offsetY = 0) => {
+              const px = 2 + col * 2;
+              const py = 1 + row * 2 + offsetY;
+              setPixel(px, py); setPixel(px + 1, py);
+              setPixel(px, py + 1); setPixel(px + 1, py + 1);
+            };
+            // 繪製井道邊框 (左牆 x=0..1 + 頂部虛線 y=0)，支援整體往下滑落
+            const drawWell = (offsetY = 0) => {
+              for (let y = 0; y <= 8; y++) { setPixel(0, y + offsetY); setPixel(1, y + offsetY); }
+              for (let x = 2; x < COLS; x += 2) setPixel(x, offsetY);
+            };
+            // 繪製「定格後的完整盤面」：前 4 排底座 + 堵門直立 I + 所有混亂方塊最終落點
+            const drawSettledBoard = (offsetY = 0) => {
+              for (let c = 0; c <= 3; c++) for (let r = 1; r <= 3; r++) drawMinoAt(c, r, offsetY);
+              for (let r = 0; r <= 3; r++) drawMinoAt(4, r, offsetY);
+              for (const pc of plan.pieces) {
+                for (const [dc, dr] of pc.cells) {
+                  const c = pc.p + dc;
+                  if (c <= 19) drawMinoAt(c, pc.rowOff + dr, offsetY);
+                }
+              }
+            };
+
+            if (cycleMs < plan.sinkStart) {
+              clearBuffer();
+              drawWell(0);
+
+              // 判斷是否處於爆倉定格後的閃爍警報階段 (blinkStart .. sinkStart)：全場所有方塊同步閃爍！
+              const isBlinking = (cycleMs >= plan.blinkStart);
+              const blinkShow = !isBlinking || (Math.floor((cycleMs - plan.blinkStart) / 100) % 2 === 0);
+
+              if (blinkShow) {
+                // 1) 畫出底座 (col=0..3 的 row=1..3)
+                drawInitialBase();
+
+                // --- 第 1 幕 (0 .. 1400ms)：O 型方塊從右側滑入，停在 col=2..3, row=1..2，完成前 4 排黃金缺口 ---
+                const oCol = (cycleMs < 1400) ? Math.max(2, 19 - Math.floor(cycleMs / 75)) : 2;
+                drawMino(oCol, 1); drawMino(oCol + 1, 1);
+                drawMino(oCol, 2); drawMino(oCol + 1, 2);
+
+                // --- 第 2 幕 (1400 .. 3100ms)：I 型長條水平對準 row=0 黃金缺口滑入... 卻在洞口 col=4 手殘轉成直立堵死！ ---
+                if (cycleMs >= 1400) {
+                  const iElapsed = cycleMs - 1400;
+                  if (iElapsed < 1250) {
+                    const iCol = Math.max(4, 19 - Math.floor(iElapsed / 80));
+                    for (let dc = 0; dc < 4; dc++) drawMino(iCol + dc, 0);
+                  } else {
+                    for (let r = 0; r <= 3; r++) drawMino(4, r);
+                  }
+                }
+
+                // --- 第 3 幕 (3100ms ~ settle)：隨機混亂方塊逐一飛入，依真實碰撞向左滑到被擋住為止，越來越快，直到塞爆右牆 (Top-Out) ---
+                for (const pc of plan.pieces) {
+                  if (cycleMs < pc.start) break;
+                  const curP = Math.max(pc.p, 20 - Math.floor((cycleMs - pc.start) / pc.stepMs));
+                  for (const [dc, dr] of pc.cells) {
+                    const c = curP + dc;
+                    if (c <= 19) drawMino(c, pc.rowOff + dr);
+                  }
+                }
+              }
+            } else if (cycleMs < plan.goStart) {
+              // --- 第 4 幕：方塊盤面連同左牆與頂部邊框一起往下滑落 (每 75ms 1 格)，掉光後再留約 4 格空白 ---
+              clearBuffer();
+              const sinkY = Math.floor((cycleMs - plan.sinkStart) / 75);
+              drawWell(sinkY);
+              drawSettledBoard(sinkY);
+            } else if (cycleMs < plan.goStart + 2900) {
+              // --- 第 5 幕：乾淨畫面上 "GAME OVER" 逐字由天而降 (-7 -> -1 -> 2 彈跳就位) -> 停頓 -> 整排往下滑落消失 ---
+              clearBuffer();
+              const goElapsed = cycleMs - plan.goStart; // 0 .. 2899ms
+              // 前 1900ms 逐字落下並穩定停頓；1900ms 後整排文字同步向下滑落消失！
+              const goSinkOffset = (goElapsed >= 1900) ? Math.floor((goElapsed - 1900) / 85) : 0;
+
+              const charY = (idx) => {
+                const charStart = idx * 50;
+                if (goElapsed < charStart) return -7;
+                if (goElapsed < charStart + 90) return -1;
+                return 2 + goSinkOffset;
+              };
+
+              // 繪製居中滿版 "GAME OVER" (x=1..40, y=2..6)
+              drawSprite(SPRITES.pokeCharG, 4, 5, 1,  charY(0)); // G (x=1..4)
+              drawSprite(SPRITES.pokeCharA, 4, 5, 6,  charY(1)); // A (x=6..9)
+              drawSprite(SPRITES.pokeCharM, 5, 5, 11, charY(2)); // M (x=11..15)
+              drawSprite(SPRITES.arcCharE,  3, 5, 17, charY(3)); // E (x=17..19)
+
+              drawSprite(SPRITES.pokeCharO, 4, 5, 23, charY(4)); // O (x=23..26)
+              drawSprite(SPRITES.pokeCharV, 4, 5, 28, charY(5)); // V (x=28..31)
+              drawSprite(SPRITES.arcCharE,  3, 5, 33, charY(6)); // E (x=33..35)
+              drawSprite(SPRITES.pokeCharR, 4, 5, 37, charY(7)); // R (x=37..40)
+            } else {
+              // --- 第 6 幕：0.6 秒黑屏停頓後，重新隨機生成下一輪堆疊 ---
+              clearBuffer();
+            }
+          } else {
+            // 按鍵解除鬧鐘：【神操作救援！長條 I 方塊筆直滑入 row=0 黃金缺口 -> 4 排消行 -> TETRIS!!】
+            if (elapsedMs < 480) {
+              // 階段 A (0 .. 480ms)：長條方塊不轉歪，高速筆直滑入 col=0..3, row=0 黃金缺口「咔！」一聲完美嚴絲合縫！
+              drawReadyStack();
+              const insertCol = Math.max(0, 8 - Math.floor(elapsedMs / 45));
+              for (let dc = 0; dc < 4; dc++) drawMino(insertCol + dc, 0);
+            } else if (elapsedMs < 1000) {
+              // 階段 B (480 .. 1000ms)：前 4 排 (col=0..3, row=0..3) 完美湊齊後，由右向左逐排消行 (優雅消行，不亂閃全屏)！
+              const clearCols = Math.floor((elapsedMs - 480) / 120); // 依序消除 col=3 -> 2 -> 1 -> 0
+              for (let c = 0; c <= 3 - clearCols; c++) {
+                for (let r = 0; r <= 3; r++) drawMino(c, r);
+              }
+            } else {
+              // 階段 C (1000ms 後)：前 4 排完美清空！畫面中央亮出勝利大字 "TETRIS!!"
+              drawSprite(SPRITES.arcCharT,  3, 5, 7,  2); // T (x=7..9)
+              drawSprite(SPRITES.arcCharE,  3, 5, 11, 2); // E (x=11..13)
+              drawSprite(SPRITES.arcCharT,  3, 5, 15, 2); // T (x=15..17)
+              drawSprite(SPRITES.pokeCharR, 4, 5, 19, 2); // R (x=19..22)
+              drawLine(24, 2, 24, 6);                     // I (1x5, x=24)
+              drawSprite(SPRITES.arcCharS,  3, 5, 26, 2); // S (x=26..28)
+              drawLine(31, 2, 31, 4); setPixel(31, 6);    // ! (x=31)
+              drawLine(33, 2, 33, 4); setPixel(33, 6);    // ! (x=33)
+            }
+          }
+        }
+
+        // 9. 貪食蛇
+        else if (activeAlarmTheme === 'snake') renderSnake(elapsedMs, nowMs);
+
+        // 10. 笨鳥先飛
+        else if (activeAlarmTheme === 'flappy') renderFlappy(elapsedMs, nowMs);
+
+        // 11~13. 節奏音軌 / 公路賽車 / 乒乓球
+        else if (activeAlarmTheme === 'rhythm') renderRhythm(elapsedMs, nowMs);
+        else if (activeAlarmTheme === 'racer') renderRacer(elapsedMs, nowMs);
+        else if (activeAlarmTheme === 'pong') renderPong(elapsedMs, nowMs);
+
+        // 處理反轉彩蛋停留計時 (固定 2500ms = 2.5 秒)
+        if (alarmDismissed) {
+          if (nowMs - themeDismissStartMs >= 2500) {
+            switchMode('CLOCK');
+          }
+        }
+      }
+
+      renderMatrix();
+      requestAnimationFrame(gameLoop);
+    }
+
+    /* =====================================================================
+     * 8. 模式切換與初始化
+     * ===================================================================== */
+    const CLOCK_STYLE_DESC = {
+      original: '🕒 目前為【原廠 / VIPnytt】：7×9 雙線加粗字體僅顯示 HH:MM，中央 2×2 大方點冒號恆亮。',
+      hybrid: '🕒 目前為【折衷版】：保留原廠雙線粗胖筆畫 (6×9) 顯示 HH:MM + 2×2 恆亮粗冒號 + 右下角 3×5 小秒數。'
+    };
+
+    function setClockStyle(style) {
+      currentClockStyle = style;
+      if (currentMode !== 'CLOCK') {
+        switchMode('CLOCK');
+      }
+      document.getElementById('btnClockStyleOriginal').classList.toggle('active', style === 'original');
+      document.getElementById('btnClockStyleHybrid').classList.toggle('active', style === 'hybrid');
+      document.getElementById('modeDesc').textContent = CLOCK_STYLE_DESC[style];
+    }
+
+    function switchMode(m) {
+      currentMode = m;
+      stopMelody();
+      updatePacmanVariantButtons(0);
+      updateSnakePlanButtons();
+      updateRacerPlanButtons();
+      updatePongPlanButtons();
+      document.getElementById('indAL1').classList.remove('active');
+      document.getElementById('btnModeClock').classList.toggle('active', m === 'CLOCK');
+      document.getElementById('btnModeTama').classList.toggle('active', m === 'TAMA');
+      
+      const k1 = document.getElementById('k1Label');
+      const k2 = document.getElementById('k2Label');
+      const k3 = document.getElementById('k3Label');
+      const k4 = document.getElementById('k4Label');
+
+      if (m === 'TAMA') {
+        k1.textContent = 'KEY 1 (餵正餐)';
+        k2.textContent = 'KEY 2 (訓練 / 出拳 / 應戰)';
+        k3.textContent = 'KEY 3 (打掃 / 打針)';
+        k4.textContent = 'KEY 4 (狀態 / 圖鑑)';
+        document.getElementById('modeDesc').textContent = '👾 像素怪獸模式 (按鍵為暫定)：K1 餵正餐、K2 訓練 (力量條到頂再按第二下出拳) / 接受野生挑戰、K3 打掃或打針、K4 看狀態（最後一頁是圖鑑書架）。下方測試面板可快轉時間。';
+      } else {
+        k1.textContent = 'KEY 1 (鬧鐘設定)';
+        k2.textContent = 'KEY 2 (夜間亮度)';
+        k3.textContent = 'KEY 3 (切換時鐘樣式)';
+        k4.textContent = 'KEY 4 (進入怪獸模式)';
+        document.getElementById('modeDesc').textContent = CLOCK_STYLE_DESC[currentClockStyle];
+      }
+    }
+
+    document.getElementById('btnModeClock').onclick = () => switchMode('CLOCK');
+    document.getElementById('btnModeTama').onclick = () => switchMode('TAMA');
+    document.getElementById('btnRandomAlarm').onclick = () => triggerRandomAlarm();
+
+    // 音量控制
+    const volSlider = document.getElementById('volSlider');
+    const volText = document.getElementById('volText');
+    volSlider.oninput = () => {
+      initAudio();
+      const v = volSlider.value / 100;
+      volText.textContent = volSlider.value + '%';
+      if (masterGain) masterGain.gain.setValueAtTime(v * 0.4, audioCtx.currentTime);
+    };
+
+    document.getElementById('muteBtn').onclick = () => {
+      isMuted = !isMuted;
+      document.getElementById('muteBtn').textContent = isMuted ? '已靜音' : '靜音';
+    };
+
+    document.getElementById('testToneBtn').onclick = () => {
+      initAudio();
+      playTone(1000, 200);
+    };
+
+    // 導出當前幀為 C++ 陣列
+    document.getElementById('btnExportCpp').onclick = () => {
+      let out = '// 42x9 點陣數據 (每 row 6 bytes, 共 54 bytes)\n';
+      out += 'const uint8_t frame_bitmap[54] PROGMEM = {\n';
+      for (let r = 0; r < ROWS; r++) {
+        out += '  ';
+        for (let b = 0; b < 6; b++) {
+          let byteVal = 0;
+          for (let bit = 0; bit < 8; bit++) {
+            const col = b * 8 + bit;
+            if (col < COLS) {
+              if (buffer[r * COLS + col]) byteVal |= (1 << (7 - bit));
+            }
+          }
+          out += '0x' + byteVal.toString(16).padStart(2, '0').toUpperCase() + ', ';
+        }
+        out += '\n';
+      }
+      out += '};\n';
+      document.getElementById('txtExport').value = out;
+    };
+
+    // 啟動主迴圈
+    monLoad();
+    monUpdateUI();
+    switchMode('CLOCK');
+    requestAnimationFrame(gameLoop);
+  </script>
+</body>
+</html>

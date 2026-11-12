@@ -1,0 +1,32 @@
+# macOS / 編輯器
+.DS_Store
+._*
+.AppleDouble
+.LSOverride
+.Spotlight-V100
+.Trashes
+.fseventsd
+.TemporaryItems
+.DocumentRevisions-V100
+*.swp
+.vscode/
+.idea/
+
+# Claude Code / superpowers 設計討論暫存
+.superpowers/
+
+# Node
+node_modules/
+
+# Arduino / PlatformIO 編譯產物
+build/
+.pio/
+*.bin
+*.elf
+
+# Syncthing
+.stfolder/
+.stversions/
+.stignore
+.stignore-shared
+*.sync-conflict-*

@@ -1,0 +1,57 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 860 400" font-family="'PingFang TC','Noto Sans TC','Microsoft JhengHei',sans-serif" font-size="15">
+  <rect width="860" height="400" fill="#ffffff"/>
+  <defs>
+    <marker id="ar" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#d23"/></marker>
+    <marker id="ag" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#1a8a3a"/></marker>
+    <!-- 機身（俯視剖面：上方為正面 LED，下方開口由背蓋蓋住）；右壁內側有凹槽 -->
+    <g id="body">
+      <path d="M60,170 L60,70 L340,70 L340,170" fill="none" stroke="#333" stroke-width="8" stroke-linejoin="round"/>
+      <rect x="70" y="78" width="260" height="14" fill="#f0c040"/>
+      <text x="200" y="106" text-anchor="middle" font-size="12" fill="#666">正面 LED 點陣</text>
+      <rect x="335" y="134" width="6" height="16" fill="#fff"/>
+      <!-- 左側電池彈簧片 -->
+      <path d="M68,150 l10,-6 l-10,-6 l10,-6" fill="none" stroke="#888" stroke-width="2"/>
+    </g>
+    <!-- 背蓋：平板 + 右端立起的卡勾，勾尖朝外卡進右壁凹槽 -->
+    <g id="cover">
+      <rect x="56" y="172" width="288" height="10" fill="#4a7bd0"/>
+      <path d="M322,172 L322,134 L340,134 L340,138 L330,148 L330,172 Z" fill="#4a7bd0"/>
+    </g>
+  </defs>
+
+  <!-- ✗ 錯誤 -->
+  <text x="200" y="34" text-anchor="middle" font-size="18" font-weight="bold" fill="#d23">✗ 先把左側往外拉</text>
+  <use href="#body"/>
+  <g transform="rotate(-9 338 177)"><use href="#cover"/></g>
+  <path d="M90,200 L90,250" stroke="#d23" stroke-width="4" marker-end="url(#ar)"/>
+  <text x="104" y="238" fill="#d23">左側拉開</text>
+  <circle cx="338" cy="177" r="5" fill="#d23"/>
+  <text x="270" y="232" fill="#d23">以右側為支點轉動</text>
+  <path d="M372,165 Q395,148 372,132" fill="none" stroke="#d23" stroke-width="3" marker-end="url(#ar)"/>
+  <text x="400" y="118" fill="#d23" text-anchor="middle">勾尖壓得更深</text>
+  <text x="200" y="290" text-anchor="middle" fill="#333">右側倒勾被槓桿壓緊 → 越拉越卡</text>
+
+  <!-- ✓ 正確 -->
+  <g transform="translate(430,0)">
+    <text x="200" y="34" text-anchor="middle" font-size="18" font-weight="bold" fill="#1a8a3a">✓ 左側壓回原位，撬右側</text>
+    <use href="#body"/>
+    <use href="#cover"/>
+    <path d="M90,240 L90,192" stroke="#1a8a3a" stroke-width="4" marker-end="url(#ag)"/>
+    <text x="104" y="236" fill="#1a8a3a">① 左側完全壓回</text>
+    <!-- 一字起子插入右側接縫 -->
+    <rect x="340" y="174" width="56" height="6" fill="#999" transform="rotate(25 340 177)"/>
+    <rect x="392" y="170" width="32" height="14" rx="3" fill="#e08a1e" transform="rotate(25 340 177)"/>
+    <path d="M310,200 L310,250" stroke="#1a8a3a" stroke-width="4" marker-end="url(#ag)"/>
+    <text x="200" y="272" text-anchor="middle" fill="#1a8a3a">② 起子插入右側接縫，把背蓋右端向外撬</text>
+    <text x="200" y="302" text-anchor="middle" fill="#333">倒勾的壓力正確釋放 → 背蓋脫出</text>
+  </g>
+
+  <!-- 圖例 -->
+  <g transform="translate(60,335)" font-size="13" fill="#555">
+    <rect x="0" y="-10" width="18" height="10" fill="#333"/><text x="24" y="0">機身外殼</text>
+    <rect x="100" y="-10" width="18" height="10" fill="#4a7bd0"/><text x="124" y="0">背蓋（右端為倒勾卡榫）</text>
+    <path d="M300,-2 l8,-5 l-8,-5" fill="none" stroke="#888" stroke-width="2"/><text x="316" y="0">左側電池彈簧片（只輕微卡住）</text>
+    <rect x="560" y="-12" width="14" height="12" fill="#fff" stroke="#999"/><text x="580" y="0">右壁內側凹槽</text>
+    <text x="0" y="28">俯視剖面示意圖，非實際比例與形狀。上方為正面 LED，下方為背蓋。</text>
+  </g>
+</svg>

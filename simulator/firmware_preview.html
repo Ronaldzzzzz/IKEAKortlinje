@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>韌體播放預覽</title>
+<style>
+  :root { --bg: #0f172a; --panel: #1e293b; --border: #334155; --text: #e2e8f0; --muted: #94a3b8; --led: #ff3b30; --off: #2a1414; --accent: #38bdf8; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.5 system-ui, -apple-system, "PingFang TC", sans-serif; }
+  main { max-width: 900px; margin: 0 auto; padding: 16px; }
+  h1 { font-size: 1.2rem; margin: 0 0 4px; }
+  p.note { color: var(--muted); font-size: 0.85rem; margin: 0 0 12px; }
+  canvas { width: 100%; max-width: 860px; background: #000; border-radius: 8px; border: 1px solid var(--border); image-rendering: pixelated; }
+  .row { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0; }
+  button { background: var(--panel); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 6px 10px; cursor: pointer; font: inherit; font-size: 0.85rem; }
+  button.active { border-color: var(--accent); color: var(--accent); }
+  #status { font-family: ui-monospace, Menlo, monospace; font-size: 0.85rem; color: var(--muted); min-height: 1.5em; }
+</style>
+</head>
+<body>
+<main>
+  <h1>🔌 韌體播放預覽</h1>
+  <p class="note">播放 <code>firmware/AlarmClips.h</code> 同一份預錄資料，挑劇本、循環、前奏重播、解除彩蛋的規則與 ESP32 韌體 <code>RetroAlarms.h</code> 完全相同。蜂鳴器為單音 (新音效會蓋掉舊音效)，與實機一致。資料由 <code>node tools/export_firmware.js</code> 產生。</p>
+  <canvas id="led" width="840" height="180"></canvas>
+  <div id="status">選一個主題開始</div>
+  <div class="row" id="themes"></div>
+  <div class="row" id="clips"></div>
+  <div class="row">
+    <button id="btnRandom">🎲 隨機主題 (同韌體 triggerRandom)</button>
+    <button id="btnDismiss">✋ 按鍵解除</button>
+    <button id="btnStop">⏹ 停止</button>
+    <button id="btnMute">🔊 聲音：開</button>
+  </div>
+</main>
+<script src="firmware_clips.js"></script>
+<script>
+  const FC = FIRMWARE_CLIPS;
+  const canvas = document.getElementById('led'), ctx = canvas.getContext('2d');
+  const CELL = 20;
+
+  // ---------- 蜂鳴器 (單音方波，等同韌體 SoundPlayer.tone / sweep) ----------
+  let audio = null, osc = null, muted = false;
+  function buzz(f1, f2, dur) {
+    if (muted) return;
+    if (!audio) audio = new AudioContext();
+    if (osc) { try { osc.stop(); } catch (e) {} }
+    const g = audio.createGain();
+    g.gain.value = 0.15;
+    osc = audio.createOscillator();
+    osc.type = 'square';
+    const now = audio.currentTime;
+    osc.frequency.setValueAtTime(f1, now);
+    if (f2) osc.frequency.exponentialRampToValueAtTime(f2, now + dur / 1000);
+    osc.connect(g).connect(audio.destination);
+    osc.start(now);
+    osc.stop(now + dur / 1000);
+  }
+  function silence() { if (osc) { try { osc.stop(); } catch (e) {} osc = null; } }
+
+  // ---------- 播放引擎 (逐行對應 RetroAlarms.h) ----------
+  const E = { active: false, dismissed: false, theme: null, clip: null, clipIdx: 0, lastClip: -1, boost: -1, forced: null,
+              seq: null, stepIdx: 0, stepStart: 0, sounds: null, soundIdx: 0, tlStart: 0, introOn: false, introIdx: 0, introStart: 0 };
+  const rnd = n => Math.floor(Math.random() * n);
+
+  function pickClip() {
+    const T = E.theme, n = T.clips.length;
+    if (E.forced !== null) return E.forced;
+    if (n <= 1) return 0;
+    if (E.boost >= 0 && rnd(100) < 90) return E.boost;
+    if (T.pick === 'weighted') {
+      let r = rnd(T.clips.reduce((s, c) => s + c.weight, 0)), i = 0;
+      for (; i < n - 1; i++) { if (r < T.clips[i].weight) break; r -= T.clips[i].weight; }
+      return i;
+    }
+    if (T.pick === 'norepeat' && E.lastClip >= 0) { let p = rnd(n - 1); if (p >= E.lastClip) p++; return p; }
+    return rnd(n);
+  }
+  function startTimeline(seq, sounds, at) { E.seq = seq; E.stepIdx = 0; E.stepStart = at; E.sounds = sounds; E.soundIdx = 0; E.tlStart = at; }
+  function startClip(i, at) {
+    E.clipIdx = i; E.clip = E.theme.clips[i]; E.lastClip = i; E.boost = E.clip.boostNext;
+    startTimeline(E.clip.seq, E.clip.sounds, at);
+    renderButtons();
+  }
+  function startIntro(at) { E.introOn = E.theme.intro.length > 0; E.introIdx = 0; E.introStart = at; }
+  function trigger(ti, forced = null) {
+    E.theme = FC.themes[ti]; E.forced = forced; E.active = true; E.dismissed = false; E.lastClip = -1; E.boost = -1;
+    silence();
+    const now = performance.now();
+    startIntro(now);
+    startClip(pickClip(), now);
+  }
+  function dismiss() {
+    if (!E.active || E.dismissed) return;
+    E.dismissed = true; E.introOn = false; silence();
+    const d = E.theme.dismiss[E.clip.dismiss];
+    startTimeline(d.seq, d.sounds, performance.now());
+  }
+  function fire(list, idxKey, elapsed) {
+    while (E[idxKey] < list.length) {
+      const [t, f1, f2, dur] = list[E[idxKey]];
+      if (t > elapsed) return true;
+      E[idxKey]++;
+      if (elapsed - t <= 250) buzz(f1, f2, dur);
+    }
+    return false;
+  }
+  function update(now) {
+    if (!E.active) return;
+    while (E.stepIdx < E.seq.length && now - E.stepStart >= E.seq[E.stepIdx][1]) { E.stepStart += E.seq[E.stepIdx][1]; E.stepIdx++; }
+    if (E.stepIdx >= E.seq.length) {
+      if (E.dismissed) { E.active = false; E.dismissed = false; silence(); renderButtons(); return; }
+      const at = E.stepStart;
+      startClip(pickClip(), at);
+      if (E.theme.introEachLoop) startIntro(at);
+    }
+    fire(E.sounds, 'soundIdx', now - E.tlStart);
+    if (E.introOn) E.introOn = fire(E.theme.intro, 'introIdx', now - E.introStart);
+  }
+
+  function draw() {
+    ctx.fillStyle = '#000'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+    const hex = E.active && E.seq[E.stepIdx] ? FC.frames[E.seq[E.stepIdx][0]] : null;
+    for (let y = 0; y < 9; y++) for (let x = 0; x < 42; x++) {
+      const on = hex && (parseInt(hex.substr((y * 6 + (x >> 3)) * 2, 2), 16) & (0x80 >> (x & 7)));
+      ctx.fillStyle = on ? getComputedStyle(document.documentElement).getPropertyValue('--led') : '#1c0d0d';
+      ctx.beginPath(); ctx.arc(x * CELL + CELL / 2, y * CELL + CELL / 2, CELL * 0.38, 0, Math.PI * 2); ctx.fill();
+    }
+    const st = document.getElementById('status');
+    if (!E.active) st.textContent = '已停止 (韌體此時回到時鐘)';
+    else {
+      const t = Math.round(performance.now() - E.tlStart);
+      st.textContent = E.dismissed ? `${E.theme.name}：反轉彩蛋 ${t} / 2500ms`
+        : `${E.theme.name}：${E.clip.label}　${t} / ${E.clip.loop}ms　(挑選規則 ${E.theme.pick}${E.forced !== null ? '，已指定劇本' : ''})`;
+    }
+  }
+  function loop() { update(performance.now()); draw(); requestAnimationFrame(loop); }
+
+  // ---------- 按鈕 ----------
+  function renderButtons() {
+    const tb = document.getElementById('themes'); tb.innerHTML = '';
+    FC.themes.forEach((T, i) => {
+      const b = document.createElement('button');
+      b.textContent = `${i + 1}. ${T.name}`;
+      b.className = E.active && E.theme === T ? 'active' : '';
+      b.onclick = () => trigger(i);
+      tb.appendChild(b);
+    });
+    const cb = document.getElementById('clips'); cb.innerHTML = '';
+    if (E.theme && E.theme.clips.length > 1) {
+      E.theme.clips.forEach((c, i) => {
+        const b = document.createElement('button');
+        b.textContent = c.label;
+        b.className = E.active && E.clipIdx === i ? 'active' : '';
+        b.onclick = () => trigger(FC.themes.indexOf(E.theme), i);
+        cb.appendChild(b);
+      });
+    }
+  }
+  document.getElementById('btnRandom').onclick = () => trigger(rnd(FC.themes.length));
+  document.getElementById('btnDismiss').onclick = dismiss;
+  document.getElementById('btnStop').onclick = () => { E.active = false; silence(); renderButtons(); };
+  document.getElementById('btnMute').onclick = e => { muted = !muted; e.target.textContent = muted ? '🔇 聲音：關' : '🔊 聲音：開'; if (muted) silence(); };
+  window.addEventListener('keydown', e => { if (e.key === ' ') { e.preventDefault(); dismiss(); } });
+  renderButtons();
+  loop();
+</script>
+</body>
+</html>
