@@ -2,7 +2,7 @@
 
 本指南整合開源專案 [`kobebeefg/ikea-clock-lab`](https://github.com/kobebeefg/ikea-clock-lab) 與 [`VIPnytt/Kortlinje`](https://github.com/VIPnytt/Kortlinje) 的逆向研究成果，提供一套**硬體利用率接近 100%**、難度適中且支援**無線 OTA 更新**的完整改裝方案。
 
-> 目前版本 **v0.1**：本指南描述的是改裝的完整目標。v0.1 已完成的是模擬器與韌體模組（見 `retro_clock_features_spec.md`「七、實施排程與驗收準則」）；主程式整合、按鍵與聲音待硬體焊接完成後處理，拆機與焊接的照片教學整理中。改裝風險請見 `README.md` 的免責聲明。
+> 目前版本 **v0.1**：本指南描述的是改裝的完整目標。v0.1 已完成的是模擬器與韌體模組（見 `retro_clock_features_spec.md`「八、實施排程與驗收準則」）；主程式整合、按鍵與聲音待硬體焊接完成後處理，拆機與焊接的照片教學整理中。改裝風險請見 `README.md` 的免責聲明。
 
 ---
 
