@@ -42,10 +42,10 @@ node simulator/tools/export_monster.js    # 怪獸圖元 → firmware/MonsterSpr
 
 本專案整合以下兩個開源專案的硬體逆向研究與時鐘基礎，在此致謝：
 
-* [`kobebeefg/ikea-clock-lab`](https://github.com/kobebeefg/ikea-clock-lab)（原專案未標示授權，著作權屬原作者）
+* [`kobebeefg/ikea-clock-lab`](https://github.com/kobebeefg/ikea-clock-lab)（經原作者同意，其程式碼可在本專案中使用並以 MIT 授權發佈；著作權屬原作者）
 * [`VIPnytt/Kortlinje`](https://github.com/VIPnytt/Kortlinje)（MIT License，著作權屬原作者）
 
-v0.1 只參考上述專案的硬體研究成果並附上連結，沒有收錄其原始碼；日後若引用其程式碼，會在對應檔案保留原作者的著作權與授權聲明。
+v0.1 只參考上述專案的硬體研究成果並附上連結，尚未收錄其原始碼；日後引用其程式碼時，會在對應檔案註明出處與原作者著作權。
 
 ## AI 輔助開發
 
